@@ -407,29 +407,20 @@ func (copier *Copier) copyAgencies() error {
 // copyLevels writes levels.
 func (copier *Copier) copyLevels() error {
 	// Levels
-	bt := []tl.Entity{}
 	for e := range copier.Reader.Levels() {
-		e := e
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	return nil
 }
 
 func (copier *Copier) copyStops() error {
 	// Copy fn
-	bt := []tl.Entity{}
 	copyStop := func(ent tl.Stop) error {
 		sid := ent.EntityID()
 		copier.geomCache.AddStop(sid, ent)
-		e := ent
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&ent); err != nil {
 			return err
 		}
 		return nil
@@ -443,12 +434,8 @@ func (copier *Copier) copyStops() error {
 			}
 		}
 	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
-	}
 
 	// Second pass for platforms, exits, and generic nodes
-	bt = nil
 	for e := range copier.Reader.Stops() {
 		if e.LocationType == 0 || e.LocationType == 2 || e.LocationType == 3 {
 			if err := copyStop(e); err != nil {
@@ -456,12 +443,8 @@ func (copier *Copier) copyStops() error {
 			}
 		}
 	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
-	}
 
 	// Third pass for boarding areas
-	bt = nil
 	for e := range copier.Reader.Stops() {
 		if e.LocationType == 4 {
 			if err := copyStop(e); err != nil {
@@ -469,39 +452,24 @@ func (copier *Copier) copyStops() error {
 			}
 		}
 	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
-	}
 	copier.logCount(&tl.Stop{})
 	return nil
 }
 
 func (copier *Copier) copyFares() error {
 	// FareAttributes
-	bt := []tl.Entity{}
 	for e := range copier.Reader.FareAttributes() {
-		e := e
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	copier.logCount(&tl.FareAttribute{})
 
 	// FareRules
-	bt = nil
 	for e := range copier.Reader.FareRules() {
-		e := e
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	copier.logCount(&tl.FareRule{})
 	return nil
@@ -509,16 +477,10 @@ func (copier *Copier) copyFares() error {
 
 func (copier *Copier) copyPathways() error {
 	// Pathways
-	bt := []tl.Entity{}
 	for e := range copier.Reader.Pathways() {
-		e := e
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	copier.logCount(&tl.Pathway{})
 	return nil
@@ -526,16 +488,10 @@ func (copier *Copier) copyPathways() error {
 
 // copyRoutes writes routes
 func (copier *Copier) copyRoutes() error {
-	bt := []tl.Entity{}
 	for e := range copier.Reader.Routes() {
-		var err error
-		e := e
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	copier.logCount(&tl.Route{})
 	return nil
@@ -543,16 +499,10 @@ func (copier *Copier) copyRoutes() error {
 
 // copyFeedInfos writes FeedInfos
 func (copier *Copier) copyFeedInfos() error {
-	bt := []tl.Entity{}
 	for e := range copier.Reader.FeedInfos() {
-		e := e
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	copier.logCount(&tl.FeedInfo{})
 	return nil
@@ -560,16 +510,10 @@ func (copier *Copier) copyFeedInfos() error {
 
 // copyTransfers writes Transfers
 func (copier *Copier) copyTransfers() error {
-	bt := []tl.Entity{}
 	for e := range copier.Reader.Transfers() {
-		e := e
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	copier.logCount(&tl.Transfer{})
 	return nil
@@ -577,7 +521,6 @@ func (copier *Copier) copyTransfers() error {
 
 // copyShapes writes Shapes
 func (copier *Copier) copyShapes() error {
-	// Not safe for batch copy (currently)
 	for e := range copier.Reader.Shapes() {
 		sid := e.EntityID()
 		if _, ok, err := copier.CopyEntity(&e); err != nil {
@@ -592,16 +535,10 @@ func (copier *Copier) copyShapes() error {
 
 // copyFrequencies writes Frequencies
 func (copier *Copier) copyFrequencies() error {
-	bt := []tl.Entity{}
 	for e := range copier.Reader.Frequencies() {
-		e := e
-		var err error
-		if bt, err = copier.checkBatch(bt, &e); err != nil {
+		if _, _, err := copier.CopyEntity(&e); err != nil {
 			return err
 		}
-	}
-	if err := copier.writeBatch(bt); err != nil {
-		return err
 	}
 	copier.logCount(&tl.Frequency{})
 	return nil
