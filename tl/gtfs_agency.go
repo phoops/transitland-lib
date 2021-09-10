@@ -31,9 +31,9 @@ func (ent *Agency) EntityKey() string {
 func (ent *Agency) Errors() (errs []error) {
 	errs = append(errs, ent.BaseEntity.Errors()...)
 	errs = append(errs, enum.CheckPresent("agency_name", ent.AgencyName)...)
-	errs = append(errs, enum.CheckPresent("agency_url", ent.AgencyURL)...)
+	// errs = append(errs, enum.CheckPresent("agency_url", ent.AgencyURL)...)
 	errs = append(errs, enum.CheckPresent("agency_timezone", ent.AgencyTimezone)...)
-	errs = append(errs, enum.CheckURL("agency_url", ent.AgencyURL)...)
+	// errs = append(errs, enum.CheckURL("agency_url", ent.AgencyURL)...)
 	errs = append(errs, enum.CheckURL("agency_fare_url", ent.AgencyFareURL)...)
 	errs = append(errs, enum.CheckLanguage("agency_lang", ent.AgencyLang)...)
 	errs = append(errs, enum.CheckEmail("agency_email", ent.AgencyEmail)...)
