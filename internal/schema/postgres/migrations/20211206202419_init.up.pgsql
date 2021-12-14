@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS hstore;
 CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent; CREATE TEXT SEARCH CONFIGURATION tl ( COPY = simple ); ALTER TEXT SEARCH CONFIGURATION tl ALTER MAPPING FOR hword, hword_part, word WITH unaccent;
-CREATE TABLE public.gtfs_calendars (
+CREATE TABLE gtfs_calendars (
     id bigint NOT NULL,
     service_id character varying NOT NULL,
     monday integer NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE public.gtfs_calendars (
     feed_version_id bigint NOT NULL,
     generated boolean NOT NULL
 );
-CREATE TABLE public.feed_versions (
+CREATE TABLE feed_versions (
     id bigint NOT NULL,
     feed_id bigint NOT NULL,
     feed_type character varying DEFAULT 'gtfs'::character varying NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE public.feed_versions (
     latest_calendar_date date NOT NULL,
     sha1 character varying NOT NULL,
     md5 character varying,
-    tags public.hstore,
+    tags hstore,
     fetched_at timestamp without time zone NOT NULL,
     imported_at timestamp without time zone,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
@@ -44,12 +44,12 @@ CREATE TABLE public.feed_versions (
     created_by text,
     updated_by text
 );
-CREATE TABLE public.tl_census_values (
+CREATE TABLE tl_census_values (
     geography_id bigint NOT NULL,
     table_id bigint NOT NULL,
     table_values jsonb DEFAULT '{}'::jsonb NOT NULL
 );
-CREATE TABLE public.gtfs_stop_times (
+CREATE TABLE gtfs_stop_times (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE public.gtfs_stop_times (
     stop_headsign text
 )
 PARTITION BY HASH (feed_version_id);
-CREATE TABLE public.tl_agency_places (
+CREATE TABLE tl_agency_places (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     agency_id bigint NOT NULL,
@@ -76,26 +76,26 @@ CREATE TABLE public.tl_agency_places (
     best_match boolean,
     best_match_type integer
 );
-CREATE SEQUENCE public.agency_places_id_seq
+CREATE SEQUENCE agency_places_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.agency_places_id_seq OWNED BY public.tl_agency_places.id;
-CREATE TABLE public.current_feeds (
+ALTER SEQUENCE agency_places_id_seq OWNED BY tl_agency_places.id;
+CREATE TABLE current_feeds (
     id bigint NOT NULL,
     onestop_id character varying NOT NULL,
     url character varying,
     spec character varying DEFAULT 'gtfs'::character varying NOT NULL,
-    tags public.hstore,
+    tags hstore,
     last_fetched_at timestamp without time zone,
     last_imported_at timestamp without time zone,
     version integer,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     created_or_updated_in_changeset_id integer,
-    geometry public.geography(Geometry,4326),
+    geometry geography(Geometry,4326),
     active_feed_version_id integer,
     edited_attributes character varying[] DEFAULT '{}'::character varying[],
     name character varying,
@@ -111,24 +111,24 @@ CREATE TABLE public.current_feeds (
     languages jsonb DEFAULT '[]'::jsonb NOT NULL,
     feed_namespace_id character varying DEFAULT ''::character varying NOT NULL,
     file character varying DEFAULT ''::character varying NOT NULL,
-    textsearch tsvector GENERATED ALWAYS AS (((setweight(to_tsvector('public.tl'::regconfig, (onestop_id)::text), 'A'::"char") || setweight(to_tsvector('public.tl'::regconfig, (COALESCE(name, ''::character varying))::text), 'A'::"char")) || setweight(to_tsvector('public.tl'::regconfig, COALESCE((urls ->> 'static_current'::text), ''::text)), 'B'::"char"))) STORED,
+    textsearch tsvector GENERATED ALWAYS AS (((setweight(to_tsvector('tl'::regconfig, (onestop_id)::text), 'A'::"char") || setweight(to_tsvector('tl'::regconfig, (COALESCE(name, ''::character varying))::text), 'A'::"char")) || setweight(to_tsvector('tl'::regconfig, COALESCE((urls ->> 'static_current'::text), ''::text)), 'B'::"char"))) STORED,
     feed_tags jsonb
 );
-CREATE SEQUENCE public.current_feeds_id_seq
+CREATE SEQUENCE current_feeds_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.current_feeds_id_seq OWNED BY public.current_feeds.id;
-CREATE TABLE public.current_operators (
+ALTER SEQUENCE current_feeds_id_seq OWNED BY current_feeds.id;
+CREATE TABLE current_operators (
     id integer NOT NULL,
     name character varying,
-    tags public.hstore,
+    tags hstore,
     created_at timestamp without time zone DEFAULT now(),
     updated_at timestamp without time zone DEFAULT now(),
     onestop_id character varying,
-    geometry public.geography(Geometry,4326),
+    geometry geography(Geometry,4326),
     created_or_updated_in_changeset_id integer,
     version integer,
     timezone character varying,
@@ -140,19 +140,19 @@ CREATE TABLE public.current_operators (
     edited_attributes character varying[] DEFAULT '{}'::character varying[],
     associated_feeds jsonb DEFAULT '{}'::jsonb NOT NULL,
     deleted_at timestamp without time zone,
-    textsearch tsvector GENERATED ALWAYS AS (((setweight(to_tsvector('public.tl'::regconfig, (COALESCE(name, ''::character varying))::text), 'A'::"char") || setweight(to_tsvector('public.tl'::regconfig, (COALESCE(short_name, ''::character varying))::text), 'A'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (COALESCE(onestop_id, ''::character varying))::text), 'A'::"char"))) STORED,
+    textsearch tsvector GENERATED ALWAYS AS (((setweight(to_tsvector('tl'::regconfig, (COALESCE(name, ''::character varying))::text), 'A'::"char") || setweight(to_tsvector('tl'::regconfig, (COALESCE(short_name, ''::character varying))::text), 'A'::"char")) || setweight(to_tsvector('tl'::regconfig, (COALESCE(onestop_id, ''::character varying))::text), 'A'::"char"))) STORED,
     operator_tags jsonb,
     file text NOT NULL
 );
-CREATE SEQUENCE public.current_operators_id_seq
+CREATE SEQUENCE current_operators_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.current_operators_id_seq OWNED BY public.current_operators.id;
-CREATE TABLE public.current_operators_in_feed (
+ALTER SEQUENCE current_operators_id_seq OWNED BY current_operators.id;
+CREATE TABLE current_operators_in_feed (
     id integer NOT NULL,
     gtfs_agency_id character varying,
     version integer,
@@ -167,35 +167,35 @@ CREATE TABLE public.current_operators_in_feed (
     resolved_name text,
     resolved_short_name text,
     resolved_places text,
-    textsearch tsvector GENERATED ALWAYS AS (((((setweight(to_tsvector('public.tl'::regconfig, COALESCE(resolved_onestop_id, (''::character varying)::text)), 'A'::"char") || setweight(to_tsvector('public.tl'::regconfig, COALESCE(resolved_name, (''::character varying)::text)), 'A'::"char")) || setweight(to_tsvector('public.tl'::regconfig, COALESCE(resolved_short_name, (''::character varying)::text)), 'B'::"char")) || setweight(to_tsvector('public.tl'::regconfig, COALESCE(resolved_places, (''::character varying)::text)), 'B'::"char")) || setweight(to_tsvector('public.tl'::regconfig, COALESCE(resolved_gtfs_agency_id, (''::character varying)::text)), 'C'::"char"))) STORED
+    textsearch tsvector GENERATED ALWAYS AS (((((setweight(to_tsvector('tl'::regconfig, COALESCE(resolved_onestop_id, (''::character varying)::text)), 'A'::"char") || setweight(to_tsvector('tl'::regconfig, COALESCE(resolved_name, (''::character varying)::text)), 'A'::"char")) || setweight(to_tsvector('tl'::regconfig, COALESCE(resolved_short_name, (''::character varying)::text)), 'B'::"char")) || setweight(to_tsvector('tl'::regconfig, COALESCE(resolved_places, (''::character varying)::text)), 'B'::"char")) || setweight(to_tsvector('tl'::regconfig, COALESCE(resolved_gtfs_agency_id, (''::character varying)::text)), 'C'::"char"))) STORED
 );
-CREATE SEQUENCE public.current_operators_in_feed_id_seq
+CREATE SEQUENCE current_operators_in_feed_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.current_operators_in_feed_id_seq OWNED BY public.current_operators_in_feed.id;
-CREATE TABLE public.ext_faresv2_areas (
+ALTER SEQUENCE current_operators_in_feed_id_seq OWNED BY current_operators_in_feed.id;
+CREATE TABLE ext_faresv2_areas (
     area_id text NOT NULL,
     area_name text NOT NULL,
     greater_area_id text,
-    geometry public.geography(Polygon,4326) NOT NULL,
+    geometry geography(Polygon,4326) NOT NULL,
     internal_notes text,
     id bigint NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_areas_id_seq
+CREATE SEQUENCE ext_faresv2_areas_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_areas_id_seq OWNED BY public.ext_faresv2_areas.id;
-CREATE TABLE public.ext_faresv2_fare_capping (
+ALTER SEQUENCE ext_faresv2_areas_id_seq OWNED BY ext_faresv2_areas.id;
+CREATE TABLE ext_faresv2_fare_capping (
     fare_product_id text,
     eligible_cap_id text,
     fare_container_id text,
@@ -216,14 +216,14 @@ CREATE TABLE public.ext_faresv2_fare_capping (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_fare_capping_id_seq
+CREATE SEQUENCE ext_faresv2_fare_capping_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_fare_capping_id_seq OWNED BY public.ext_faresv2_fare_capping.id;
-CREATE TABLE public.ext_faresv2_fare_containers (
+ALTER SEQUENCE ext_faresv2_fare_capping_id_seq OWNED BY ext_faresv2_fare_capping.id;
+CREATE TABLE ext_faresv2_fare_containers (
     fare_container_id text NOT NULL,
     fare_container_name text NOT NULL,
     minimum_initial_purchase double precision,
@@ -236,14 +236,14 @@ CREATE TABLE public.ext_faresv2_fare_containers (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_fare_containers_id_seq
+CREATE SEQUENCE ext_faresv2_fare_containers_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_fare_containers_id_seq OWNED BY public.ext_faresv2_fare_containers.id;
-CREATE TABLE public.ext_faresv2_fare_leg_rules (
+ALTER SEQUENCE ext_faresv2_fare_containers_id_seq OWNED BY ext_faresv2_fare_containers.id;
+CREATE TABLE ext_faresv2_fare_leg_rules (
     leg_group_id text NOT NULL,
     fare_leg_name text,
     network_id text,
@@ -272,14 +272,14 @@ CREATE TABLE public.ext_faresv2_fare_leg_rules (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_fare_leg_rules_id_seq
+CREATE SEQUENCE ext_faresv2_fare_leg_rules_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_fare_leg_rules_id_seq OWNED BY public.ext_faresv2_fare_leg_rules.id;
-CREATE TABLE public.ext_faresv2_fare_products (
+ALTER SEQUENCE ext_faresv2_fare_leg_rules_id_seq OWNED BY ext_faresv2_fare_leg_rules.id;
+CREATE TABLE ext_faresv2_fare_products (
     fare_product_id text NOT NULL,
     fare_product_name text NOT NULL,
     rider_category_id text,
@@ -306,14 +306,14 @@ CREATE TABLE public.ext_faresv2_fare_products (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_fare_products_id_seq
+CREATE SEQUENCE ext_faresv2_fare_products_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_fare_products_id_seq OWNED BY public.ext_faresv2_fare_products.id;
-CREATE TABLE public.ext_faresv2_fare_timeframes (
+ALTER SEQUENCE ext_faresv2_fare_products_id_seq OWNED BY ext_faresv2_fare_products.id;
+CREATE TABLE ext_faresv2_fare_timeframes (
     timeframe_id text NOT NULL,
     start_time integer NOT NULL,
     end_time integer NOT NULL,
@@ -323,14 +323,14 @@ CREATE TABLE public.ext_faresv2_fare_timeframes (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_fare_timeframes_id_seq
+CREATE SEQUENCE ext_faresv2_fare_timeframes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_fare_timeframes_id_seq OWNED BY public.ext_faresv2_fare_timeframes.id;
-CREATE TABLE public.ext_faresv2_fare_transfer_rules (
+ALTER SEQUENCE ext_faresv2_fare_timeframes_id_seq OWNED BY ext_faresv2_fare_timeframes.id;
+CREATE TABLE ext_faresv2_fare_transfer_rules (
     from_leg_group_id text,
     to_leg_group_id text,
     is_symmetrical integer,
@@ -354,14 +354,14 @@ CREATE TABLE public.ext_faresv2_fare_transfer_rules (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_fare_transfer_rules_id_seq
+CREATE SEQUENCE ext_faresv2_fare_transfer_rules_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_fare_transfer_rules_id_seq OWNED BY public.ext_faresv2_fare_transfer_rules.id;
-CREATE TABLE public.ext_faresv2_rider_categories (
+ALTER SEQUENCE ext_faresv2_fare_transfer_rules_id_seq OWNED BY ext_faresv2_fare_transfer_rules.id;
+CREATE TABLE ext_faresv2_rider_categories (
     rider_category_id text NOT NULL,
     rider_category_name text NOT NULL,
     min_age integer,
@@ -373,14 +373,14 @@ CREATE TABLE public.ext_faresv2_rider_categories (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_faresv2_rider_categories_id_seq
+CREATE SEQUENCE ext_faresv2_rider_categories_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_faresv2_rider_categories_id_seq OWNED BY public.ext_faresv2_rider_categories.id;
-CREATE TABLE public.ext_plus_calendar_attributes (
+ALTER SEQUENCE ext_faresv2_rider_categories_id_seq OWNED BY ext_faresv2_rider_categories.id;
+CREATE TABLE ext_plus_calendar_attributes (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -388,14 +388,14 @@ CREATE TABLE public.ext_plus_calendar_attributes (
     service_id bigint NOT NULL,
     service_description text NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_calendar_attributes_id_seq
+CREATE SEQUENCE ext_plus_calendar_attributes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_calendar_attributes_id_seq OWNED BY public.ext_plus_calendar_attributes.id;
-CREATE TABLE public.ext_plus_directions (
+ALTER SEQUENCE ext_plus_calendar_attributes_id_seq OWNED BY ext_plus_calendar_attributes.id;
+CREATE TABLE ext_plus_directions (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -404,14 +404,14 @@ CREATE TABLE public.ext_plus_directions (
     direction_id text NOT NULL,
     direction text NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_directions_id_seq
+CREATE SEQUENCE ext_plus_directions_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_directions_id_seq OWNED BY public.ext_plus_directions.id;
-CREATE TABLE public.ext_plus_fare_rider_categories (
+ALTER SEQUENCE ext_plus_directions_id_seq OWNED BY ext_plus_directions.id;
+CREATE TABLE ext_plus_fare_rider_categories (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -422,14 +422,14 @@ CREATE TABLE public.ext_plus_fare_rider_categories (
     expiration_date date,
     commencement_date date
 );
-CREATE SEQUENCE public.ext_plus_fare_rider_categories_id_seq
+CREATE SEQUENCE ext_plus_fare_rider_categories_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_fare_rider_categories_id_seq OWNED BY public.ext_plus_fare_rider_categories.id;
-CREATE TABLE public.ext_plus_farezone_attributes (
+ALTER SEQUENCE ext_plus_fare_rider_categories_id_seq OWNED BY ext_plus_fare_rider_categories.id;
+CREATE TABLE ext_plus_farezone_attributes (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -437,14 +437,14 @@ CREATE TABLE public.ext_plus_farezone_attributes (
     zone_id text NOT NULL,
     zone_name text NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_farezone_attributes_id_seq
+CREATE SEQUENCE ext_plus_farezone_attributes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_farezone_attributes_id_seq OWNED BY public.ext_plus_farezone_attributes.id;
-CREATE TABLE public.ext_plus_realtime_routes (
+ALTER SEQUENCE ext_plus_farezone_attributes_id_seq OWNED BY ext_plus_farezone_attributes.id;
+CREATE TABLE ext_plus_realtime_routes (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -452,14 +452,14 @@ CREATE TABLE public.ext_plus_realtime_routes (
     route_id bigint NOT NULL,
     realtime_enabled integer NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_realtime_routes_id_seq
+CREATE SEQUENCE ext_plus_realtime_routes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_realtime_routes_id_seq OWNED BY public.ext_plus_realtime_routes.id;
-CREATE TABLE public.ext_plus_realtime_stops (
+ALTER SEQUENCE ext_plus_realtime_routes_id_seq OWNED BY ext_plus_realtime_routes.id;
+CREATE TABLE ext_plus_realtime_stops (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -468,14 +468,14 @@ CREATE TABLE public.ext_plus_realtime_stops (
     stop_id bigint NOT NULL,
     realtime_stop_id text NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_realtime_stops_id_seq
+CREATE SEQUENCE ext_plus_realtime_stops_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_realtime_stops_id_seq OWNED BY public.ext_plus_realtime_stops.id;
-CREATE TABLE public.ext_plus_realtime_trips (
+ALTER SEQUENCE ext_plus_realtime_stops_id_seq OWNED BY ext_plus_realtime_stops.id;
+CREATE TABLE ext_plus_realtime_trips (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -483,14 +483,14 @@ CREATE TABLE public.ext_plus_realtime_trips (
     trip_id bigint NOT NULL,
     realtime_trip_id text NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_realtime_trips_id_seq
+CREATE SEQUENCE ext_plus_realtime_trips_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_realtime_trips_id_seq OWNED BY public.ext_plus_realtime_trips.id;
-CREATE TABLE public.ext_plus_rider_categories (
+ALTER SEQUENCE ext_plus_realtime_trips_id_seq OWNED BY ext_plus_realtime_trips.id;
+CREATE TABLE ext_plus_rider_categories (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -499,14 +499,14 @@ CREATE TABLE public.ext_plus_rider_categories (
     rider_category_id integer NOT NULL,
     rider_category_description text NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_rider_categories_id_seq
+CREATE SEQUENCE ext_plus_rider_categories_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_rider_categories_id_seq OWNED BY public.ext_plus_rider_categories.id;
-CREATE TABLE public.ext_plus_stop_attributes (
+ALTER SEQUENCE ext_plus_rider_categories_id_seq OWNED BY ext_plus_rider_categories.id;
+CREATE TABLE ext_plus_stop_attributes (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -517,14 +517,14 @@ CREATE TABLE public.ext_plus_stop_attributes (
     relative_position text NOT NULL,
     stop_city text NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_stop_attributes_id_seq
+CREATE SEQUENCE ext_plus_stop_attributes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_stop_attributes_id_seq OWNED BY public.ext_plus_stop_attributes.id;
-CREATE TABLE public.ext_plus_timepoints (
+ALTER SEQUENCE ext_plus_stop_attributes_id_seq OWNED BY ext_plus_stop_attributes.id;
+CREATE TABLE ext_plus_timepoints (
     id bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
@@ -532,14 +532,14 @@ CREATE TABLE public.ext_plus_timepoints (
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL
 );
-CREATE SEQUENCE public.ext_plus_timepoints_id_seq
+CREATE SEQUENCE ext_plus_timepoints_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ext_plus_timepoints_id_seq OWNED BY public.ext_plus_timepoints.id;
-CREATE TABLE public.feed_states (
+ALTER SEQUENCE ext_plus_timepoints_id_seq OWNED BY ext_plus_timepoints.id;
+CREATE TABLE feed_states (
     id bigint NOT NULL,
     feed_id bigint NOT NULL,
     feed_version_id bigint,
@@ -553,14 +553,14 @@ CREATE TABLE public.feed_states (
     updated_at timestamp without time zone NOT NULL,
     feed_version_import_retention_period integer DEFAULT 90 NOT NULL
 );
-CREATE SEQUENCE public.feed_states_id_seq
+CREATE SEQUENCE feed_states_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.feed_states_id_seq OWNED BY public.feed_states.id;
-CREATE TABLE public.feed_version_file_infos (
+ALTER SEQUENCE feed_states_id_seq OWNED BY feed_states.id;
+CREATE TABLE feed_version_file_infos (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     name text NOT NULL,
@@ -573,14 +573,14 @@ CREATE TABLE public.feed_version_file_infos (
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL
 );
-CREATE SEQUENCE public.feed_version_file_infos_id_seq
+CREATE SEQUENCE feed_version_file_infos_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.feed_version_file_infos_id_seq OWNED BY public.feed_version_file_infos.id;
-CREATE TABLE public.feed_version_gtfs_imports (
+ALTER SEQUENCE feed_version_file_infos_id_seq OWNED BY feed_version_file_infos.id;
+CREATE TABLE feed_version_gtfs_imports (
     id bigint NOT NULL,
     success boolean NOT NULL,
     import_log text NOT NULL,
@@ -599,14 +599,14 @@ CREATE TABLE public.feed_version_gtfs_imports (
     skip_entity_marked_count jsonb,
     interpolated_stop_time_count integer
 );
-CREATE SEQUENCE public.feed_version_gtfs_imports_id_seq
+CREATE SEQUENCE feed_version_gtfs_imports_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.feed_version_gtfs_imports_id_seq OWNED BY public.feed_version_gtfs_imports.id;
-CREATE TABLE public.feed_version_service_levels (
+ALTER SEQUENCE feed_version_gtfs_imports_id_seq OWNED BY feed_version_gtfs_imports.id;
+CREATE TABLE feed_version_service_levels (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     route_id text,
@@ -624,21 +624,21 @@ CREATE TABLE public.feed_version_service_levels (
     saturday bigint NOT NULL,
     sunday bigint NOT NULL
 );
-CREATE SEQUENCE public.feed_version_service_levels_id_seq
+CREATE SEQUENCE feed_version_service_levels_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.feed_version_service_levels_id_seq OWNED BY public.feed_version_service_levels.id;
-CREATE SEQUENCE public.feed_versions_id_seq
+ALTER SEQUENCE feed_version_service_levels_id_seq OWNED BY feed_version_service_levels.id;
+CREATE SEQUENCE feed_versions_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.feed_versions_id_seq OWNED BY public.feed_versions.id;
-CREATE TABLE public.gtfs_agencies (
+ALTER SEQUENCE feed_versions_id_seq OWNED BY feed_versions.id;
+CREATE TABLE gtfs_agencies (
     id bigint NOT NULL,
     agency_id character varying NOT NULL,
     agency_name character varying NOT NULL,
@@ -651,16 +651,16 @@ CREATE TABLE public.gtfs_agencies (
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL,
-    textsearch tsvector GENERATED ALWAYS AS ((((setweight(to_tsvector('public.tl'::regconfig, (agency_name)::text), 'A'::"char") || setweight(to_tsvector('public.tl'::regconfig, (agency_url)::text), 'B'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (agency_email)::text), 'C'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (agency_id)::text), 'B'::"char"))) STORED
+    textsearch tsvector GENERATED ALWAYS AS ((((setweight(to_tsvector('tl'::regconfig, (agency_name)::text), 'A'::"char") || setweight(to_tsvector('tl'::regconfig, (agency_url)::text), 'B'::"char")) || setweight(to_tsvector('tl'::regconfig, (agency_email)::text), 'C'::"char")) || setweight(to_tsvector('tl'::regconfig, (agency_id)::text), 'B'::"char"))) STORED
 );
-CREATE SEQUENCE public.gtfs_agencies_id_seq
+CREATE SEQUENCE gtfs_agencies_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_agencies_id_seq OWNED BY public.gtfs_agencies.id;
-CREATE TABLE public.gtfs_calendar_dates (
+ALTER SEQUENCE gtfs_agencies_id_seq OWNED BY gtfs_agencies.id;
+CREATE TABLE gtfs_calendar_dates (
     id bigint NOT NULL,
     date date NOT NULL,
     exception_type integer NOT NULL,
@@ -669,21 +669,21 @@ CREATE TABLE public.gtfs_calendar_dates (
     feed_version_id bigint NOT NULL,
     service_id bigint NOT NULL
 );
-CREATE SEQUENCE public.gtfs_calendar_dates_id_seq
+CREATE SEQUENCE gtfs_calendar_dates_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_calendar_dates_id_seq OWNED BY public.gtfs_calendar_dates.id;
-CREATE SEQUENCE public.gtfs_calendars_id_seq
+ALTER SEQUENCE gtfs_calendar_dates_id_seq OWNED BY gtfs_calendar_dates.id;
+CREATE SEQUENCE gtfs_calendars_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_calendars_id_seq OWNED BY public.gtfs_calendars.id;
-CREATE TABLE public.gtfs_fare_attributes (
+ALTER SEQUENCE gtfs_calendars_id_seq OWNED BY gtfs_calendars.id;
+CREATE TABLE gtfs_fare_attributes (
     id bigint NOT NULL,
     fare_id character varying NOT NULL,
     price double precision NOT NULL,
@@ -696,14 +696,14 @@ CREATE TABLE public.gtfs_fare_attributes (
     agency_id bigint,
     transfers integer
 );
-CREATE SEQUENCE public.gtfs_fare_attributes_id_seq
+CREATE SEQUENCE gtfs_fare_attributes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_fare_attributes_id_seq OWNED BY public.gtfs_fare_attributes.id;
-CREATE TABLE public.gtfs_fare_rules (
+ALTER SEQUENCE gtfs_fare_attributes_id_seq OWNED BY gtfs_fare_attributes.id;
+CREATE TABLE gtfs_fare_rules (
     id bigint NOT NULL,
     origin_id character varying NOT NULL,
     destination_id character varying NOT NULL,
@@ -714,14 +714,14 @@ CREATE TABLE public.gtfs_fare_rules (
     route_id bigint,
     fare_id bigint
 );
-CREATE SEQUENCE public.gtfs_fare_rules_id_seq
+CREATE SEQUENCE gtfs_fare_rules_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_fare_rules_id_seq OWNED BY public.gtfs_fare_rules.id;
-CREATE TABLE public.gtfs_feed_infos (
+ALTER SEQUENCE gtfs_fare_rules_id_seq OWNED BY gtfs_fare_rules.id;
+CREATE TABLE gtfs_feed_infos (
     id bigint NOT NULL,
     feed_publisher_name character varying NOT NULL,
     feed_publisher_url character varying NOT NULL,
@@ -733,14 +733,14 @@ CREATE TABLE public.gtfs_feed_infos (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.gtfs_feed_infos_id_seq
+CREATE SEQUENCE gtfs_feed_infos_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_feed_infos_id_seq OWNED BY public.gtfs_feed_infos.id;
-CREATE TABLE public.gtfs_frequencies (
+ALTER SEQUENCE gtfs_feed_infos_id_seq OWNED BY gtfs_feed_infos.id;
+CREATE TABLE gtfs_frequencies (
     id bigint NOT NULL,
     start_time integer NOT NULL,
     end_time integer NOT NULL,
@@ -751,14 +751,14 @@ CREATE TABLE public.gtfs_frequencies (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL
 );
-CREATE SEQUENCE public.gtfs_frequencies_id_seq
+CREATE SEQUENCE gtfs_frequencies_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_frequencies_id_seq OWNED BY public.gtfs_frequencies.id;
-CREATE TABLE public.gtfs_levels (
+ALTER SEQUENCE gtfs_frequencies_id_seq OWNED BY gtfs_frequencies.id;
+CREATE TABLE gtfs_levels (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     level_id character varying NOT NULL,
@@ -766,17 +766,17 @@ CREATE TABLE public.gtfs_levels (
     level_name character varying NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    geometry public.geography(Polygon,4326),
+    geometry geography(Polygon,4326),
     parent_station bigint
 );
-CREATE SEQUENCE public.gtfs_levels_id_seq
+CREATE SEQUENCE gtfs_levels_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_levels_id_seq OWNED BY public.gtfs_levels.id;
-CREATE TABLE public.gtfs_pathways (
+ALTER SEQUENCE gtfs_levels_id_seq OWNED BY gtfs_levels.id;
+CREATE TABLE gtfs_pathways (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     pathway_id character varying NOT NULL,
@@ -794,14 +794,14 @@ CREATE TABLE public.gtfs_pathways (
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL
 );
-CREATE SEQUENCE public.gtfs_pathways_id_seq
+CREATE SEQUENCE gtfs_pathways_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_pathways_id_seq OWNED BY public.gtfs_pathways.id;
-CREATE TABLE public.gtfs_routes (
+ALTER SEQUENCE gtfs_pathways_id_seq OWNED BY gtfs_pathways.id;
+CREATE TABLE gtfs_routes (
     id bigint NOT NULL,
     route_id character varying NOT NULL,
     route_short_name character varying NOT NULL,
@@ -816,34 +816,34 @@ CREATE TABLE public.gtfs_routes (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL,
     agency_id bigint NOT NULL,
-    textsearch tsvector GENERATED ALWAYS AS ((((setweight(to_tsvector('public.tl'::regconfig, (route_short_name)::text), 'A'::"char") || setweight(to_tsvector('public.tl'::regconfig, (route_long_name)::text), 'A'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (route_desc)::text), 'B'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (route_id)::text), 'C'::"char"))) STORED,
+    textsearch tsvector GENERATED ALWAYS AS ((((setweight(to_tsvector('tl'::regconfig, (route_short_name)::text), 'A'::"char") || setweight(to_tsvector('tl'::regconfig, (route_long_name)::text), 'A'::"char")) || setweight(to_tsvector('tl'::regconfig, (route_desc)::text), 'B'::"char")) || setweight(to_tsvector('tl'::regconfig, (route_id)::text), 'C'::"char"))) STORED,
     network_id text,
     as_route integer
 );
-CREATE SEQUENCE public.gtfs_routes_id_seq
+CREATE SEQUENCE gtfs_routes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_routes_id_seq OWNED BY public.gtfs_routes.id;
-CREATE TABLE public.gtfs_shapes (
+ALTER SEQUENCE gtfs_routes_id_seq OWNED BY gtfs_routes.id;
+CREATE TABLE gtfs_shapes (
     id bigint NOT NULL,
     shape_id character varying NOT NULL,
     generated boolean DEFAULT false NOT NULL,
-    geometry public.geography(LineStringM,4326) NOT NULL,
+    geometry geography(LineStringM,4326) NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.gtfs_shapes_id_seq
+CREATE SEQUENCE gtfs_shapes_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_shapes_id_seq OWNED BY public.gtfs_shapes.id;
-CREATE TABLE public.gtfs_stop_times_0 (
+ALTER SEQUENCE gtfs_shapes_id_seq OWNED BY gtfs_shapes.id;
+CREATE TABLE gtfs_stop_times_0 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -857,7 +857,7 @@ CREATE TABLE public.gtfs_stop_times_0 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_1 (
+CREATE TABLE gtfs_stop_times_1 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -871,7 +871,7 @@ CREATE TABLE public.gtfs_stop_times_1 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_2 (
+CREATE TABLE gtfs_stop_times_2 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -885,7 +885,7 @@ CREATE TABLE public.gtfs_stop_times_2 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_3 (
+CREATE TABLE gtfs_stop_times_3 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -899,7 +899,7 @@ CREATE TABLE public.gtfs_stop_times_3 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_4 (
+CREATE TABLE gtfs_stop_times_4 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -913,7 +913,7 @@ CREATE TABLE public.gtfs_stop_times_4 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_5 (
+CREATE TABLE gtfs_stop_times_5 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -927,7 +927,7 @@ CREATE TABLE public.gtfs_stop_times_5 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_6 (
+CREATE TABLE gtfs_stop_times_6 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -941,7 +941,7 @@ CREATE TABLE public.gtfs_stop_times_6 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_7 (
+CREATE TABLE gtfs_stop_times_7 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -955,7 +955,7 @@ CREATE TABLE public.gtfs_stop_times_7 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_8 (
+CREATE TABLE gtfs_stop_times_8 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -969,7 +969,7 @@ CREATE TABLE public.gtfs_stop_times_8 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stop_times_9 (
+CREATE TABLE gtfs_stop_times_9 (
     feed_version_id bigint NOT NULL,
     trip_id bigint NOT NULL,
     stop_id bigint NOT NULL,
@@ -983,7 +983,7 @@ CREATE TABLE public.gtfs_stop_times_9 (
     interpolated smallint,
     stop_headsign text
 );
-CREATE TABLE public.gtfs_stops (
+CREATE TABLE gtfs_stops (
     id bigint NOT NULL,
     stop_id character varying NOT NULL,
     stop_code character varying NOT NULL,
@@ -994,23 +994,23 @@ CREATE TABLE public.gtfs_stops (
     location_type integer NOT NULL,
     stop_timezone character varying NOT NULL,
     wheelchair_boarding integer NOT NULL,
-    geometry public.geography(Point,4326) NOT NULL,
+    geometry geography(Point,4326) NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL,
     parent_station bigint,
     level_id bigint,
-    textsearch tsvector GENERATED ALWAYS AS (((((setweight(to_tsvector('public.tl'::regconfig, (stop_name)::text), 'A'::"char") || setweight(to_tsvector('public.tl'::regconfig, (stop_desc)::text), 'B'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (stop_code)::text), 'C'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (stop_url)::text), 'C'::"char")) || setweight(to_tsvector('public.tl'::regconfig, (stop_id)::text), 'D'::"char"))) STORED,
+    textsearch tsvector GENERATED ALWAYS AS (((((setweight(to_tsvector('tl'::regconfig, (stop_name)::text), 'A'::"char") || setweight(to_tsvector('tl'::regconfig, (stop_desc)::text), 'B'::"char")) || setweight(to_tsvector('tl'::regconfig, (stop_code)::text), 'C'::"char")) || setweight(to_tsvector('tl'::regconfig, (stop_url)::text), 'C'::"char")) || setweight(to_tsvector('tl'::regconfig, (stop_id)::text), 'D'::"char"))) STORED,
     area_id text
 );
-CREATE SEQUENCE public.gtfs_stops_id_seq
+CREATE SEQUENCE gtfs_stops_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_stops_id_seq OWNED BY public.gtfs_stops.id;
-CREATE TABLE public.gtfs_transfers (
+ALTER SEQUENCE gtfs_stops_id_seq OWNED BY gtfs_stops.id;
+CREATE TABLE gtfs_transfers (
     id bigint NOT NULL,
     transfer_type integer NOT NULL,
     min_transfer_time integer,
@@ -1021,14 +1021,14 @@ CREATE TABLE public.gtfs_transfers (
     to_stop_id bigint NOT NULL,
     as_route integer
 );
-CREATE SEQUENCE public.gtfs_transfers_id_seq
+CREATE SEQUENCE gtfs_transfers_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_transfers_id_seq OWNED BY public.gtfs_transfers.id;
-CREATE TABLE public.gtfs_trips (
+ALTER SEQUENCE gtfs_transfers_id_seq OWNED BY gtfs_transfers.id;
+CREATE TABLE gtfs_trips (
     id bigint NOT NULL,
     trip_id character varying NOT NULL,
     trip_headsign character varying NOT NULL,
@@ -1047,14 +1047,14 @@ CREATE TABLE public.gtfs_trips (
     journey_pattern_id text NOT NULL,
     journey_pattern_offset integer NOT NULL
 );
-CREATE SEQUENCE public.gtfs_trips_id_seq
+CREATE SEQUENCE gtfs_trips_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.gtfs_trips_id_seq OWNED BY public.gtfs_trips.id;
-CREATE TABLE public.ne_10m_admin_1_states_provinces (
+ALTER SEQUENCE gtfs_trips_id_seq OWNED BY gtfs_trips.id;
+CREATE TABLE ne_10m_admin_1_states_provinces (
     ogc_fid integer NOT NULL,
     featurecla character varying(20),
     scalerank numeric(2,0),
@@ -1139,17 +1139,17 @@ CREATE TABLE public.ne_10m_admin_1_states_provinces (
     name_vi character varying(49),
     name_zh character varying(61),
     ne_id numeric(10,0),
-    geometry public.geography(MultiPolygon,4326)
+    geometry geography(MultiPolygon,4326)
 );
-CREATE SEQUENCE public.ne_10m_admin_1_states_provinces_ogc_fid_seq
+CREATE SEQUENCE ne_10m_admin_1_states_provinces_ogc_fid_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ne_10m_admin_1_states_provinces_ogc_fid_seq OWNED BY public.ne_10m_admin_1_states_provinces.ogc_fid;
-CREATE TABLE public.ne_10m_populated_places (
+ALTER SEQUENCE ne_10m_admin_1_states_provinces_ogc_fid_seq OWNED BY ne_10m_admin_1_states_provinces.ogc_fid;
+CREATE TABLE ne_10m_populated_places (
     ogc_fid integer NOT NULL,
     scalerank numeric(4,0),
     natscale numeric(4,0),
@@ -1189,17 +1189,17 @@ CREATE TABLE public.ne_10m_populated_places (
     checkme numeric(4,0),
     min_zoom numeric(6,1),
     ne_id numeric(10,0),
-    geometry public.geography(Point,4326)
+    geometry geography(Point,4326)
 );
-CREATE SEQUENCE public.ne_10m_populated_places_ogc_fid_seq
+CREATE SEQUENCE ne_10m_populated_places_ogc_fid_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.ne_10m_populated_places_ogc_fid_seq OWNED BY public.ne_10m_populated_places.ogc_fid;
-CREATE TABLE public.tl_route_headways (
+ALTER SEQUENCE ne_10m_populated_places_ogc_fid_seq OWNED BY ne_10m_populated_places.ogc_fid;
+CREATE TABLE tl_route_headways (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     route_id bigint NOT NULL,
@@ -1229,60 +1229,60 @@ CREATE TABLE public.tl_route_headways (
     headway_seconds_night_max integer,
     departures jsonb
 );
-CREATE SEQUENCE public.route_headways_id_seq
+CREATE SEQUENCE route_headways_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.route_headways_id_seq OWNED BY public.tl_route_headways.id;
-CREATE TABLE public.tl_agency_geometries (
+ALTER SEQUENCE route_headways_id_seq OWNED BY tl_route_headways.id;
+CREATE TABLE tl_agency_geometries (
     agency_id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
-    geometry public.geography(Polygon,4326),
-    centroid public.geography(Point,4326)
+    geometry geography(Polygon,4326),
+    centroid geography(Point,4326)
 );
-CREATE TABLE public.tl_agency_onestop_ids (
+CREATE TABLE tl_agency_onestop_ids (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     agency_id bigint NOT NULL,
     onestop_id text NOT NULL
 );
-CREATE SEQUENCE public.tl_agency_onestop_ids_id_seq
+CREATE SEQUENCE tl_agency_onestop_ids_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_agency_onestop_ids_id_seq OWNED BY public.tl_agency_onestop_ids.id;
-CREATE TABLE public.tl_census_datasets (
+ALTER SEQUENCE tl_agency_onestop_ids_id_seq OWNED BY tl_agency_onestop_ids.id;
+CREATE TABLE tl_census_datasets (
     id bigint NOT NULL,
     dataset_name text NOT NULL,
     year_min integer NOT NULL,
     year_max integer NOT NULL,
     url text NOT NULL
 );
-CREATE SEQUENCE public.tl_census_datasets_id_seq
+CREATE SEQUENCE tl_census_datasets_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_census_datasets_id_seq OWNED BY public.tl_census_datasets.id;
-CREATE TABLE public.tl_census_fields (
+ALTER SEQUENCE tl_census_datasets_id_seq OWNED BY tl_census_datasets.id;
+CREATE TABLE tl_census_fields (
     id bigint NOT NULL,
     table_id bigint NOT NULL,
     field_name text NOT NULL,
     field_title text NOT NULL
 );
-CREATE SEQUENCE public.tl_census_fields_id_seq
+CREATE SEQUENCE tl_census_fields_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_census_fields_id_seq OWNED BY public.tl_census_fields.id;
-CREATE TABLE public.tl_census_geographies (
+ALTER SEQUENCE tl_census_fields_id_seq OWNED BY tl_census_fields.id;
+CREATE TABLE tl_census_geographies (
     id bigint NOT NULL,
     source_id bigint NOT NULL,
     layer_name text NOT NULL,
@@ -1290,44 +1290,44 @@ CREATE TABLE public.tl_census_geographies (
     name text,
     aland numeric,
     awater numeric,
-    geometry public.geography(Polygon,4326)
+    geometry geography(Polygon,4326)
 );
-CREATE SEQUENCE public.tl_census_geographies_id_seq
+CREATE SEQUENCE tl_census_geographies_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_census_geographies_id_seq OWNED BY public.tl_census_geographies.id;
-CREATE TABLE public.tl_census_sources (
+ALTER SEQUENCE tl_census_geographies_id_seq OWNED BY tl_census_geographies.id;
+CREATE TABLE tl_census_sources (
     id bigint NOT NULL,
     dataset_id bigint NOT NULL,
     source_name text NOT NULL,
     url text NOT NULL,
     sha1 text NOT NULL
 );
-CREATE SEQUENCE public.tl_census_sources_id_seq
+CREATE SEQUENCE tl_census_sources_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_census_sources_id_seq OWNED BY public.tl_census_sources.id;
-CREATE TABLE public.tl_census_tables (
+ALTER SEQUENCE tl_census_sources_id_seq OWNED BY tl_census_sources.id;
+CREATE TABLE tl_census_tables (
     id bigint NOT NULL,
     dataset_id bigint NOT NULL,
     table_name text NOT NULL,
     table_title text NOT NULL,
     table_group text NOT NULL
 );
-CREATE SEQUENCE public.tl_census_tables_id_seq
+CREATE SEQUENCE tl_census_tables_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_census_tables_id_seq OWNED BY public.tl_census_tables.id;
-CREATE TABLE public.tl_ext_fare_networks (
+ALTER SEQUENCE tl_census_tables_id_seq OWNED BY tl_census_tables.id;
+CREATE TABLE tl_ext_fare_networks (
     network_id text NOT NULL,
     as_route integer NOT NULL,
     target_feed_onestop_id text NOT NULL,
@@ -1337,14 +1337,14 @@ CREATE TABLE public.tl_ext_fare_networks (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     feed_version_id bigint NOT NULL
 );
-CREATE SEQUENCE public.tl_ext_fare_networks_id_seq
+CREATE SEQUENCE tl_ext_fare_networks_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_ext_fare_networks_id_seq OWNED BY public.tl_ext_fare_networks.id;
-CREATE TABLE public.tl_ext_gtfs_stops (
+ALTER SEQUENCE tl_ext_fare_networks_id_seq OWNED BY tl_ext_fare_networks.id;
+CREATE TABLE tl_ext_gtfs_stops (
     id bigint NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
@@ -1353,47 +1353,47 @@ CREATE TABLE public.tl_ext_gtfs_stops (
     target_stop_id text NOT NULL,
     inactive boolean DEFAULT false NOT NULL
 );
-CREATE TABLE public.tl_feed_version_geometries (
+CREATE TABLE tl_feed_version_geometries (
     feed_version_id bigint NOT NULL,
-    geometry public.geography(Polygon,4326),
-    centroid public.geography(Point,4326)
+    geometry geography(Polygon,4326),
+    centroid geography(Point,4326)
 );
-CREATE TABLE public.tl_route_geometries (
+CREATE TABLE tl_route_geometries (
     route_id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     shape_id bigint,
     direction_id integer,
     generated boolean NOT NULL,
-    geometry public.geography(LineString,4326),
-    centroid public.geography(Point,4326),
-    combined_geometry public.geometry(MultiLineString,4326)
+    geometry geography(LineString,4326),
+    centroid geography(Point,4326),
+    combined_geometry geometry(MultiLineString,4326)
 );
-CREATE TABLE public.tl_route_onestop_ids (
+CREATE TABLE tl_route_onestop_ids (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     route_id bigint NOT NULL,
     onestop_id text NOT NULL
 );
-CREATE TABLE public.tl_stop_onestop_ids (
+CREATE TABLE tl_stop_onestop_ids (
     id bigint NOT NULL,
     feed_version_id bigint NOT NULL,
     stop_id bigint NOT NULL,
     onestop_id text NOT NULL
 );
-CREATE SEQUENCE public.tl_route_onestop_ids_id_seq
+CREATE SEQUENCE tl_route_onestop_ids_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_route_onestop_ids_id_seq OWNED BY public.tl_route_onestop_ids.id;
-CREATE TABLE public.tl_route_stops (
+ALTER SEQUENCE tl_route_onestop_ids_id_seq OWNED BY tl_route_onestop_ids.id;
+CREATE TABLE tl_route_stops (
     feed_version_id bigint NOT NULL,
     agency_id bigint NOT NULL,
     route_id bigint NOT NULL,
     stop_id bigint NOT NULL
 );
-CREATE TABLE public.tl_stop_external_references (
+CREATE TABLE tl_stop_external_references (
     id bigint NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
@@ -1402,670 +1402,670 @@ CREATE TABLE public.tl_stop_external_references (
     target_stop_id text NOT NULL,
     inactive boolean
 );
-CREATE SEQUENCE public.tl_stop_onestop_ids_id_seq
+CREATE SEQUENCE tl_stop_onestop_ids_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
-ALTER SEQUENCE public.tl_stop_onestop_ids_id_seq OWNED BY public.tl_stop_onestop_ids.id;
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_0 FOR VALUES WITH (modulus 10, remainder 0);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_1 FOR VALUES WITH (modulus 10, remainder 1);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_2 FOR VALUES WITH (modulus 10, remainder 2);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_3 FOR VALUES WITH (modulus 10, remainder 3);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_4 FOR VALUES WITH (modulus 10, remainder 4);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_5 FOR VALUES WITH (modulus 10, remainder 5);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_6 FOR VALUES WITH (modulus 10, remainder 6);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_7 FOR VALUES WITH (modulus 10, remainder 7);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_8 FOR VALUES WITH (modulus 10, remainder 8);
-ALTER TABLE ONLY public.gtfs_stop_times ATTACH PARTITION public.gtfs_stop_times_9 FOR VALUES WITH (modulus 10, remainder 9);
-ALTER TABLE ONLY public.current_feeds ALTER COLUMN id SET DEFAULT nextval('public.current_feeds_id_seq'::regclass);
-ALTER TABLE ONLY public.current_operators ALTER COLUMN id SET DEFAULT nextval('public.current_operators_id_seq'::regclass);
-ALTER TABLE ONLY public.current_operators_in_feed ALTER COLUMN id SET DEFAULT nextval('public.current_operators_in_feed_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_areas ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_areas_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_fare_capping ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_fare_capping_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_fare_containers ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_fare_containers_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_fare_leg_rules ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_fare_leg_rules_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_fare_products ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_fare_products_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_fare_timeframes ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_fare_timeframes_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_fare_transfer_rules ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_fare_transfer_rules_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_faresv2_rider_categories ALTER COLUMN id SET DEFAULT nextval('public.ext_faresv2_rider_categories_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_calendar_attributes ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_calendar_attributes_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_directions ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_directions_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_fare_rider_categories ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_fare_rider_categories_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_farezone_attributes ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_farezone_attributes_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_realtime_routes ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_realtime_routes_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_realtime_stops ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_realtime_stops_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_realtime_trips ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_realtime_trips_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_rider_categories ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_rider_categories_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_stop_attributes ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_stop_attributes_id_seq'::regclass);
-ALTER TABLE ONLY public.ext_plus_timepoints ALTER COLUMN id SET DEFAULT nextval('public.ext_plus_timepoints_id_seq'::regclass);
-ALTER TABLE ONLY public.feed_states ALTER COLUMN id SET DEFAULT nextval('public.feed_states_id_seq'::regclass);
-ALTER TABLE ONLY public.feed_version_file_infos ALTER COLUMN id SET DEFAULT nextval('public.feed_version_file_infos_id_seq'::regclass);
-ALTER TABLE ONLY public.feed_version_gtfs_imports ALTER COLUMN id SET DEFAULT nextval('public.feed_version_gtfs_imports_id_seq'::regclass);
-ALTER TABLE ONLY public.feed_version_service_levels ALTER COLUMN id SET DEFAULT nextval('public.feed_version_service_levels_id_seq'::regclass);
-ALTER TABLE ONLY public.feed_versions ALTER COLUMN id SET DEFAULT nextval('public.feed_versions_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_agencies ALTER COLUMN id SET DEFAULT nextval('public.gtfs_agencies_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_calendar_dates ALTER COLUMN id SET DEFAULT nextval('public.gtfs_calendar_dates_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_calendars ALTER COLUMN id SET DEFAULT nextval('public.gtfs_calendars_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_fare_attributes ALTER COLUMN id SET DEFAULT nextval('public.gtfs_fare_attributes_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_fare_rules ALTER COLUMN id SET DEFAULT nextval('public.gtfs_fare_rules_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_feed_infos ALTER COLUMN id SET DEFAULT nextval('public.gtfs_feed_infos_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_frequencies ALTER COLUMN id SET DEFAULT nextval('public.gtfs_frequencies_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_levels ALTER COLUMN id SET DEFAULT nextval('public.gtfs_levels_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_pathways ALTER COLUMN id SET DEFAULT nextval('public.gtfs_pathways_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_routes ALTER COLUMN id SET DEFAULT nextval('public.gtfs_routes_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_shapes ALTER COLUMN id SET DEFAULT nextval('public.gtfs_shapes_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_stops ALTER COLUMN id SET DEFAULT nextval('public.gtfs_stops_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_transfers ALTER COLUMN id SET DEFAULT nextval('public.gtfs_transfers_id_seq'::regclass);
-ALTER TABLE ONLY public.gtfs_trips ALTER COLUMN id SET DEFAULT nextval('public.gtfs_trips_id_seq'::regclass);
-ALTER TABLE ONLY public.ne_10m_admin_1_states_provinces ALTER COLUMN ogc_fid SET DEFAULT nextval('public.ne_10m_admin_1_states_provinces_ogc_fid_seq'::regclass);
-ALTER TABLE ONLY public.ne_10m_populated_places ALTER COLUMN ogc_fid SET DEFAULT nextval('public.ne_10m_populated_places_ogc_fid_seq'::regclass);
-ALTER TABLE ONLY public.tl_agency_onestop_ids ALTER COLUMN id SET DEFAULT nextval('public.tl_agency_onestop_ids_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_agency_places ALTER COLUMN id SET DEFAULT nextval('public.agency_places_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_census_datasets ALTER COLUMN id SET DEFAULT nextval('public.tl_census_datasets_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_census_fields ALTER COLUMN id SET DEFAULT nextval('public.tl_census_fields_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_census_geographies ALTER COLUMN id SET DEFAULT nextval('public.tl_census_geographies_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_census_sources ALTER COLUMN id SET DEFAULT nextval('public.tl_census_sources_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_census_tables ALTER COLUMN id SET DEFAULT nextval('public.tl_census_tables_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_ext_fare_networks ALTER COLUMN id SET DEFAULT nextval('public.tl_ext_fare_networks_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_route_headways ALTER COLUMN id SET DEFAULT nextval('public.route_headways_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_route_onestop_ids ALTER COLUMN id SET DEFAULT nextval('public.tl_route_onestop_ids_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_stop_onestop_ids ALTER COLUMN id SET DEFAULT nextval('public.tl_stop_onestop_ids_id_seq'::regclass);
-ALTER TABLE ONLY public.tl_agency_places
+ALTER SEQUENCE tl_stop_onestop_ids_id_seq OWNED BY tl_stop_onestop_ids.id;
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_0 FOR VALUES WITH (modulus 10, remainder 0);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_1 FOR VALUES WITH (modulus 10, remainder 1);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_2 FOR VALUES WITH (modulus 10, remainder 2);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_3 FOR VALUES WITH (modulus 10, remainder 3);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_4 FOR VALUES WITH (modulus 10, remainder 4);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_5 FOR VALUES WITH (modulus 10, remainder 5);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_6 FOR VALUES WITH (modulus 10, remainder 6);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_7 FOR VALUES WITH (modulus 10, remainder 7);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_8 FOR VALUES WITH (modulus 10, remainder 8);
+ALTER TABLE ONLY gtfs_stop_times ATTACH PARTITION gtfs_stop_times_9 FOR VALUES WITH (modulus 10, remainder 9);
+ALTER TABLE ONLY current_feeds ALTER COLUMN id SET DEFAULT nextval('current_feeds_id_seq'::regclass);
+ALTER TABLE ONLY current_operators ALTER COLUMN id SET DEFAULT nextval('current_operators_id_seq'::regclass);
+ALTER TABLE ONLY current_operators_in_feed ALTER COLUMN id SET DEFAULT nextval('current_operators_in_feed_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_areas ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_areas_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_fare_capping ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_fare_capping_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_fare_containers ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_fare_containers_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_fare_leg_rules ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_fare_leg_rules_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_fare_products ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_fare_products_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_fare_timeframes ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_fare_timeframes_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_fare_transfer_rules ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_fare_transfer_rules_id_seq'::regclass);
+ALTER TABLE ONLY ext_faresv2_rider_categories ALTER COLUMN id SET DEFAULT nextval('ext_faresv2_rider_categories_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_calendar_attributes ALTER COLUMN id SET DEFAULT nextval('ext_plus_calendar_attributes_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_directions ALTER COLUMN id SET DEFAULT nextval('ext_plus_directions_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_fare_rider_categories ALTER COLUMN id SET DEFAULT nextval('ext_plus_fare_rider_categories_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_farezone_attributes ALTER COLUMN id SET DEFAULT nextval('ext_plus_farezone_attributes_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_realtime_routes ALTER COLUMN id SET DEFAULT nextval('ext_plus_realtime_routes_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_realtime_stops ALTER COLUMN id SET DEFAULT nextval('ext_plus_realtime_stops_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_realtime_trips ALTER COLUMN id SET DEFAULT nextval('ext_plus_realtime_trips_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_rider_categories ALTER COLUMN id SET DEFAULT nextval('ext_plus_rider_categories_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_stop_attributes ALTER COLUMN id SET DEFAULT nextval('ext_plus_stop_attributes_id_seq'::regclass);
+ALTER TABLE ONLY ext_plus_timepoints ALTER COLUMN id SET DEFAULT nextval('ext_plus_timepoints_id_seq'::regclass);
+ALTER TABLE ONLY feed_states ALTER COLUMN id SET DEFAULT nextval('feed_states_id_seq'::regclass);
+ALTER TABLE ONLY feed_version_file_infos ALTER COLUMN id SET DEFAULT nextval('feed_version_file_infos_id_seq'::regclass);
+ALTER TABLE ONLY feed_version_gtfs_imports ALTER COLUMN id SET DEFAULT nextval('feed_version_gtfs_imports_id_seq'::regclass);
+ALTER TABLE ONLY feed_version_service_levels ALTER COLUMN id SET DEFAULT nextval('feed_version_service_levels_id_seq'::regclass);
+ALTER TABLE ONLY feed_versions ALTER COLUMN id SET DEFAULT nextval('feed_versions_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_agencies ALTER COLUMN id SET DEFAULT nextval('gtfs_agencies_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_calendar_dates ALTER COLUMN id SET DEFAULT nextval('gtfs_calendar_dates_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_calendars ALTER COLUMN id SET DEFAULT nextval('gtfs_calendars_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_fare_attributes ALTER COLUMN id SET DEFAULT nextval('gtfs_fare_attributes_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_fare_rules ALTER COLUMN id SET DEFAULT nextval('gtfs_fare_rules_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_feed_infos ALTER COLUMN id SET DEFAULT nextval('gtfs_feed_infos_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_frequencies ALTER COLUMN id SET DEFAULT nextval('gtfs_frequencies_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_levels ALTER COLUMN id SET DEFAULT nextval('gtfs_levels_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_pathways ALTER COLUMN id SET DEFAULT nextval('gtfs_pathways_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_routes ALTER COLUMN id SET DEFAULT nextval('gtfs_routes_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_shapes ALTER COLUMN id SET DEFAULT nextval('gtfs_shapes_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_stops ALTER COLUMN id SET DEFAULT nextval('gtfs_stops_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_transfers ALTER COLUMN id SET DEFAULT nextval('gtfs_transfers_id_seq'::regclass);
+ALTER TABLE ONLY gtfs_trips ALTER COLUMN id SET DEFAULT nextval('gtfs_trips_id_seq'::regclass);
+ALTER TABLE ONLY ne_10m_admin_1_states_provinces ALTER COLUMN ogc_fid SET DEFAULT nextval('ne_10m_admin_1_states_provinces_ogc_fid_seq'::regclass);
+ALTER TABLE ONLY ne_10m_populated_places ALTER COLUMN ogc_fid SET DEFAULT nextval('ne_10m_populated_places_ogc_fid_seq'::regclass);
+ALTER TABLE ONLY tl_agency_onestop_ids ALTER COLUMN id SET DEFAULT nextval('tl_agency_onestop_ids_id_seq'::regclass);
+ALTER TABLE ONLY tl_agency_places ALTER COLUMN id SET DEFAULT nextval('agency_places_id_seq'::regclass);
+ALTER TABLE ONLY tl_census_datasets ALTER COLUMN id SET DEFAULT nextval('tl_census_datasets_id_seq'::regclass);
+ALTER TABLE ONLY tl_census_fields ALTER COLUMN id SET DEFAULT nextval('tl_census_fields_id_seq'::regclass);
+ALTER TABLE ONLY tl_census_geographies ALTER COLUMN id SET DEFAULT nextval('tl_census_geographies_id_seq'::regclass);
+ALTER TABLE ONLY tl_census_sources ALTER COLUMN id SET DEFAULT nextval('tl_census_sources_id_seq'::regclass);
+ALTER TABLE ONLY tl_census_tables ALTER COLUMN id SET DEFAULT nextval('tl_census_tables_id_seq'::regclass);
+ALTER TABLE ONLY tl_ext_fare_networks ALTER COLUMN id SET DEFAULT nextval('tl_ext_fare_networks_id_seq'::regclass);
+ALTER TABLE ONLY tl_route_headways ALTER COLUMN id SET DEFAULT nextval('route_headways_id_seq'::regclass);
+ALTER TABLE ONLY tl_route_onestop_ids ALTER COLUMN id SET DEFAULT nextval('tl_route_onestop_ids_id_seq'::regclass);
+ALTER TABLE ONLY tl_stop_onestop_ids ALTER COLUMN id SET DEFAULT nextval('tl_stop_onestop_ids_id_seq'::regclass);
+ALTER TABLE ONLY tl_agency_places
     ADD CONSTRAINT agency_places_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.current_feeds
+ALTER TABLE ONLY current_feeds
     ADD CONSTRAINT current_feeds_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.current_operators_in_feed
+ALTER TABLE ONLY current_operators_in_feed
     ADD CONSTRAINT current_operators_in_feed_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.current_operators
+ALTER TABLE ONLY current_operators
     ADD CONSTRAINT current_operators_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_areas
+ALTER TABLE ONLY ext_faresv2_areas
     ADD CONSTRAINT ext_faresv2_areas_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_fare_capping
+ALTER TABLE ONLY ext_faresv2_fare_capping
     ADD CONSTRAINT ext_faresv2_fare_capping_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_fare_containers
+ALTER TABLE ONLY ext_faresv2_fare_containers
     ADD CONSTRAINT ext_faresv2_fare_containers_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_fare_leg_rules
+ALTER TABLE ONLY ext_faresv2_fare_leg_rules
     ADD CONSTRAINT ext_faresv2_fare_leg_rules_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_fare_products
+ALTER TABLE ONLY ext_faresv2_fare_products
     ADD CONSTRAINT ext_faresv2_fare_products_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_fare_timeframes
+ALTER TABLE ONLY ext_faresv2_fare_timeframes
     ADD CONSTRAINT ext_faresv2_fare_timeframes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_fare_transfer_rules
+ALTER TABLE ONLY ext_faresv2_fare_transfer_rules
     ADD CONSTRAINT ext_faresv2_fare_transfer_rules_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_faresv2_rider_categories
+ALTER TABLE ONLY ext_faresv2_rider_categories
     ADD CONSTRAINT ext_faresv2_rider_categories_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_calendar_attributes
+ALTER TABLE ONLY ext_plus_calendar_attributes
     ADD CONSTRAINT ext_plus_calendar_attributes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_directions
+ALTER TABLE ONLY ext_plus_directions
     ADD CONSTRAINT ext_plus_directions_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_fare_rider_categories
+ALTER TABLE ONLY ext_plus_fare_rider_categories
     ADD CONSTRAINT ext_plus_fare_rider_categories_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_farezone_attributes
+ALTER TABLE ONLY ext_plus_farezone_attributes
     ADD CONSTRAINT ext_plus_farezone_attributes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_realtime_routes
+ALTER TABLE ONLY ext_plus_realtime_routes
     ADD CONSTRAINT ext_plus_realtime_routes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_realtime_stops
+ALTER TABLE ONLY ext_plus_realtime_stops
     ADD CONSTRAINT ext_plus_realtime_stops_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_realtime_trips
+ALTER TABLE ONLY ext_plus_realtime_trips
     ADD CONSTRAINT ext_plus_realtime_trips_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_rider_categories
+ALTER TABLE ONLY ext_plus_rider_categories
     ADD CONSTRAINT ext_plus_rider_categories_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_stop_attributes
+ALTER TABLE ONLY ext_plus_stop_attributes
     ADD CONSTRAINT ext_plus_stop_attributes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ext_plus_timepoints
+ALTER TABLE ONLY ext_plus_timepoints
     ADD CONSTRAINT ext_plus_timepoints_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.feed_states
+ALTER TABLE ONLY feed_states
     ADD CONSTRAINT feed_states_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.feed_version_file_infos
+ALTER TABLE ONLY feed_version_file_infos
     ADD CONSTRAINT feed_version_file_infos_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.feed_version_gtfs_imports
+ALTER TABLE ONLY feed_version_gtfs_imports
     ADD CONSTRAINT feed_version_gtfs_imports_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.feed_version_service_levels
+ALTER TABLE ONLY feed_version_service_levels
     ADD CONSTRAINT feed_version_service_levels_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.feed_versions
+ALTER TABLE ONLY feed_versions
     ADD CONSTRAINT feed_versions_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_agencies
+ALTER TABLE ONLY gtfs_agencies
     ADD CONSTRAINT gtfs_agencies_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_calendar_dates
+ALTER TABLE ONLY gtfs_calendar_dates
     ADD CONSTRAINT gtfs_calendar_dates_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_calendars
+ALTER TABLE ONLY gtfs_calendars
     ADD CONSTRAINT gtfs_calendars_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_fare_attributes
+ALTER TABLE ONLY gtfs_fare_attributes
     ADD CONSTRAINT gtfs_fare_attributes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_fare_rules
+ALTER TABLE ONLY gtfs_fare_rules
     ADD CONSTRAINT gtfs_fare_rules_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_feed_infos
+ALTER TABLE ONLY gtfs_feed_infos
     ADD CONSTRAINT gtfs_feed_infos_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_frequencies
+ALTER TABLE ONLY gtfs_frequencies
     ADD CONSTRAINT gtfs_frequencies_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_levels
+ALTER TABLE ONLY gtfs_levels
     ADD CONSTRAINT gtfs_levels_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_pathways
+ALTER TABLE ONLY gtfs_pathways
     ADD CONSTRAINT gtfs_pathways_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_routes
+ALTER TABLE ONLY gtfs_routes
     ADD CONSTRAINT gtfs_routes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_shapes
+ALTER TABLE ONLY gtfs_shapes
     ADD CONSTRAINT gtfs_shapes_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_stop_times
+ALTER TABLE ONLY gtfs_stop_times
     ADD CONSTRAINT gtfs_stop_times_pkey1 PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_0
+ALTER TABLE ONLY gtfs_stop_times_0
     ADD CONSTRAINT gtfs_stop_times_0_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_1
+ALTER TABLE ONLY gtfs_stop_times_1
     ADD CONSTRAINT gtfs_stop_times_1_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_2
+ALTER TABLE ONLY gtfs_stop_times_2
     ADD CONSTRAINT gtfs_stop_times_2_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_3
+ALTER TABLE ONLY gtfs_stop_times_3
     ADD CONSTRAINT gtfs_stop_times_3_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_4
+ALTER TABLE ONLY gtfs_stop_times_4
     ADD CONSTRAINT gtfs_stop_times_4_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_5
+ALTER TABLE ONLY gtfs_stop_times_5
     ADD CONSTRAINT gtfs_stop_times_5_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_6
+ALTER TABLE ONLY gtfs_stop_times_6
     ADD CONSTRAINT gtfs_stop_times_6_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_7
+ALTER TABLE ONLY gtfs_stop_times_7
     ADD CONSTRAINT gtfs_stop_times_7_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_8
+ALTER TABLE ONLY gtfs_stop_times_8
     ADD CONSTRAINT gtfs_stop_times_8_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stop_times_9
+ALTER TABLE ONLY gtfs_stop_times_9
     ADD CONSTRAINT gtfs_stop_times_9_pkey PRIMARY KEY (feed_version_id, trip_id, stop_sequence);
-ALTER TABLE ONLY public.gtfs_stops
+ALTER TABLE ONLY gtfs_stops
     ADD CONSTRAINT gtfs_stops_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_transfers
+ALTER TABLE ONLY gtfs_transfers
     ADD CONSTRAINT gtfs_transfers_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.gtfs_trips
+ALTER TABLE ONLY gtfs_trips
     ADD CONSTRAINT gtfs_trips_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.ne_10m_admin_1_states_provinces
+ALTER TABLE ONLY ne_10m_admin_1_states_provinces
     ADD CONSTRAINT ne_10m_admin_1_states_provinces_pkey PRIMARY KEY (ogc_fid);
-ALTER TABLE ONLY public.ne_10m_populated_places
+ALTER TABLE ONLY ne_10m_populated_places
     ADD CONSTRAINT ne_10m_populated_places_pkey PRIMARY KEY (ogc_fid);
-ALTER TABLE ONLY public.tl_route_headways
+ALTER TABLE ONLY tl_route_headways
     ADD CONSTRAINT route_headways_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_agency_onestop_ids
+ALTER TABLE ONLY tl_agency_onestop_ids
     ADD CONSTRAINT tl_agency_onestop_ids_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_census_datasets
+ALTER TABLE ONLY tl_census_datasets
     ADD CONSTRAINT tl_census_datasets_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_census_fields
+ALTER TABLE ONLY tl_census_fields
     ADD CONSTRAINT tl_census_fields_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_census_geographies
+ALTER TABLE ONLY tl_census_geographies
     ADD CONSTRAINT tl_census_geographies_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_census_sources
+ALTER TABLE ONLY tl_census_sources
     ADD CONSTRAINT tl_census_sources_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_census_tables
+ALTER TABLE ONLY tl_census_tables
     ADD CONSTRAINT tl_census_tables_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_ext_fare_networks
+ALTER TABLE ONLY tl_ext_fare_networks
     ADD CONSTRAINT tl_ext_fare_networks_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_ext_gtfs_stops
+ALTER TABLE ONLY tl_ext_gtfs_stops
     ADD CONSTRAINT tl_ext_gtfs_stops_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_route_onestop_ids
+ALTER TABLE ONLY tl_route_onestop_ids
     ADD CONSTRAINT tl_route_onestop_ids_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_stop_external_references
+ALTER TABLE ONLY tl_stop_external_references
     ADD CONSTRAINT tl_stop_external_references_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.tl_stop_onestop_ids
+ALTER TABLE ONLY tl_stop_onestop_ids
     ADD CONSTRAINT tl_stop_onestop_ids_pkey PRIMARY KEY (id);
-CREATE INDEX "#c_operators_cu_in_changeset_id_index" ON public.current_operators USING btree (created_or_updated_in_changeset_id);
-CREATE INDEX agency_places_agency_id_idx ON public.tl_agency_places USING btree (agency_id);
-CREATE INDEX agency_places_best_match_idx ON public.tl_agency_places USING btree (best_match);
-CREATE INDEX agency_places_feed_version_id_idx ON public.tl_agency_places USING btree (feed_version_id);
-CREATE INDEX current_feeds_feed_tags_idx ON public.current_feeds USING btree (feed_tags);
-CREATE INDEX current_feeds_textsearch_idx ON public.current_feeds USING gin (textsearch);
-CREATE INDEX current_oif ON public.current_operators_in_feed USING btree (created_or_updated_in_changeset_id);
-CREATE INDEX current_operators_in_feed_agency_id_idx ON public.current_operators_in_feed USING btree (agency_id);
-CREATE INDEX current_operators_in_feed_resolved_gtfs_agency_id_idx ON public.current_operators_in_feed USING btree (resolved_gtfs_agency_id);
-CREATE INDEX current_operators_in_feed_resolved_name_idx ON public.current_operators_in_feed USING btree (resolved_name);
-CREATE INDEX current_operators_in_feed_resolved_onestop_id_idx ON public.current_operators_in_feed USING btree (resolved_onestop_id);
-CREATE INDEX current_operators_in_feed_resolved_places_idx ON public.current_operators_in_feed USING btree (resolved_places);
-CREATE INDEX current_operators_in_feed_resolved_short_name_idx ON public.current_operators_in_feed USING btree (resolved_short_name);
-CREATE INDEX current_operators_in_feed_textsearch_idx ON public.current_operators_in_feed USING gin (textsearch);
-CREATE INDEX current_operators_operator_tags_idx ON public.current_operators USING btree (operator_tags);
-CREATE INDEX current_operators_textsearch_idx ON public.current_operators USING gin (textsearch);
-CREATE INDEX ext_plus_calendar_attributes_feed_version_id_idx ON public.ext_plus_calendar_attributes USING btree (feed_version_id);
-CREATE INDEX ext_plus_calendar_attributes_service_id_idx ON public.ext_plus_calendar_attributes USING btree (service_id);
-CREATE INDEX ext_plus_directions_feed_version_id_idx ON public.ext_plus_directions USING btree (feed_version_id);
-CREATE INDEX ext_plus_directions_route_id_idx ON public.ext_plus_directions USING btree (route_id);
-CREATE INDEX ext_plus_fare_rider_categories_fare_id_idx ON public.ext_plus_fare_rider_categories USING btree (fare_id);
-CREATE INDEX ext_plus_fare_rider_categories_feed_version_id_idx ON public.ext_plus_fare_rider_categories USING btree (feed_version_id);
-CREATE INDEX ext_plus_fare_rider_categories_rider_category_id_idx ON public.ext_plus_fare_rider_categories USING btree (rider_category_id);
-CREATE INDEX ext_plus_farezone_attributes_feed_version_id_idx ON public.ext_plus_farezone_attributes USING btree (feed_version_id);
-CREATE INDEX ext_plus_realtime_routes_feed_version_id_idx ON public.ext_plus_realtime_routes USING btree (feed_version_id);
-CREATE INDEX ext_plus_realtime_routes_route_id_idx ON public.ext_plus_realtime_routes USING btree (route_id);
-CREATE INDEX ext_plus_realtime_stops_feed_version_id_idx ON public.ext_plus_realtime_stops USING btree (feed_version_id);
-CREATE INDEX ext_plus_realtime_stops_stop_id_idx ON public.ext_plus_realtime_stops USING btree (stop_id);
-CREATE INDEX ext_plus_realtime_stops_trip_id_idx ON public.ext_plus_realtime_stops USING btree (trip_id);
-CREATE INDEX ext_plus_realtime_trips_feed_version_id_idx ON public.ext_plus_realtime_trips USING btree (feed_version_id);
-CREATE INDEX ext_plus_realtime_trips_trip_id_idx ON public.ext_plus_realtime_trips USING btree (trip_id);
-CREATE INDEX ext_plus_rider_categories_agency_id_idx ON public.ext_plus_rider_categories USING btree (agency_id);
-CREATE INDEX ext_plus_rider_categories_feed_version_id_idx ON public.ext_plus_rider_categories USING btree (feed_version_id);
-CREATE INDEX ext_plus_stop_attributes_feed_version_id_idx ON public.ext_plus_stop_attributes USING btree (feed_version_id);
-CREATE INDEX ext_plus_timepoints_feed_version_id_idx ON public.ext_plus_timepoints USING btree (feed_version_id);
-CREATE INDEX ext_plus_timepoints_stop_id_idx ON public.ext_plus_timepoints USING btree (stop_id);
-CREATE INDEX ext_plus_timepoints_trip_id_idx ON public.ext_plus_timepoints USING btree (trip_id);
-CREATE INDEX feed_version_file_infos_feed_version_id_idx ON public.feed_version_file_infos USING btree (feed_version_id);
-CREATE INDEX feed_version_file_infos_name_idx ON public.feed_version_file_infos USING btree (name);
-CREATE INDEX feed_version_file_infos_sha1_idx ON public.feed_version_file_infos USING btree (sha1);
-CREATE INDEX feed_version_service_levels_end_date_idx ON public.feed_version_service_levels USING btree (end_date);
-CREATE INDEX feed_version_service_levels_feed_version_id_idx ON public.feed_version_service_levels USING btree (feed_version_id);
-CREATE UNIQUE INDEX feed_version_service_levels_feed_version_id_route_id_start__idx ON public.feed_version_service_levels USING btree (feed_version_id, route_id, start_date, end_date);
-CREATE INDEX feed_version_service_levels_route_id_idx ON public.feed_version_service_levels USING btree (route_id);
-CREATE INDEX feed_version_service_levels_start_date_idx ON public.feed_version_service_levels USING btree (start_date);
-CREATE INDEX feed_versions_fetched_at_idx ON public.feed_versions USING btree (fetched_at);
-CREATE INDEX gtfs_agencies_textsearch_idx ON public.gtfs_agencies USING gin (textsearch);
-CREATE INDEX gtfs_calendar_dates_service_id_exception_type_date_idx ON public.gtfs_calendar_dates USING btree (service_id, exception_type, date);
-CREATE INDEX gtfs_feed_infos_feed_version_id_idx ON public.gtfs_feed_infos USING btree (feed_version_id);
-CREATE INDEX gtfs_routes_textsearch_idx ON public.gtfs_routes USING gin (textsearch);
-CREATE INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ON ONLY public.gtfs_stop_times USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_0_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_0 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_stop_id_idx ON ONLY public.gtfs_stop_times USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_0_stop_id_idx ON public.gtfs_stop_times_0 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_trip_id_idx ON ONLY public.gtfs_stop_times USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_0_trip_id_idx ON public.gtfs_stop_times_0 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_1_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_1 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_1_stop_id_idx ON public.gtfs_stop_times_1 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_1_trip_id_idx ON public.gtfs_stop_times_1 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_2_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_2 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_2_stop_id_idx ON public.gtfs_stop_times_2 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_2_trip_id_idx ON public.gtfs_stop_times_2 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_3_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_3 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_3_stop_id_idx ON public.gtfs_stop_times_3 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_3_trip_id_idx ON public.gtfs_stop_times_3 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_4_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_4 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_4_stop_id_idx ON public.gtfs_stop_times_4 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_4_trip_id_idx ON public.gtfs_stop_times_4 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_5_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_5 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_5_stop_id_idx ON public.gtfs_stop_times_5 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_5_trip_id_idx ON public.gtfs_stop_times_5 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_6_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_6 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_6_stop_id_idx ON public.gtfs_stop_times_6 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_6_trip_id_idx ON public.gtfs_stop_times_6 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_7_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_7 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_7_stop_id_idx ON public.gtfs_stop_times_7 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_7_trip_id_idx ON public.gtfs_stop_times_7 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_8_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_8 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_8_stop_id_idx ON public.gtfs_stop_times_8 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_8_trip_id_idx ON public.gtfs_stop_times_8 USING btree (trip_id);
-CREATE INDEX gtfs_stop_times_9_feed_version_id_trip_id_stop_id_idx ON public.gtfs_stop_times_9 USING btree (feed_version_id, trip_id, stop_id);
-CREATE INDEX gtfs_stop_times_9_stop_id_idx ON public.gtfs_stop_times_9 USING btree (stop_id);
-CREATE INDEX gtfs_stop_times_9_trip_id_idx ON public.gtfs_stop_times_9 USING btree (trip_id);
-CREATE INDEX gtfs_stops_textsearch_idx ON public.gtfs_stops USING gin (textsearch);
-CREATE INDEX gtfs_trips_journey_pattern_id_idx ON public.gtfs_trips USING btree (journey_pattern_id);
-CREATE INDEX index_agency_geometries_on_centroid ON public.tl_agency_geometries USING gist (centroid);
-CREATE INDEX index_agency_geometries_on_feed_version_id ON public.tl_agency_geometries USING btree (feed_version_id);
-CREATE INDEX index_agency_geometries_on_geometry ON public.tl_agency_geometries USING gist (geometry);
-CREATE UNIQUE INDEX index_agency_geometries_unique ON public.tl_agency_geometries USING btree (agency_id);
-CREATE INDEX index_current_feeds_on_active_feed_version_id ON public.current_feeds USING btree (active_feed_version_id);
-CREATE INDEX index_current_feeds_on_auth ON public.current_feeds USING btree (auth);
-CREATE INDEX index_current_feeds_on_created_or_updated_in_changeset_id ON public.current_feeds USING btree (created_or_updated_in_changeset_id);
-CREATE INDEX index_current_feeds_on_geometry ON public.current_feeds USING gist (geometry);
-CREATE UNIQUE INDEX index_current_feeds_on_onestop_id ON public.current_feeds USING btree (onestop_id);
-CREATE INDEX index_current_feeds_on_urls ON public.current_feeds USING btree (urls);
-CREATE INDEX index_current_operators_in_feed_on_feed_id ON public.current_operators_in_feed USING btree (feed_id);
-CREATE INDEX index_current_operators_in_feed_on_operator_id ON public.current_operators_in_feed USING btree (operator_id);
-CREATE INDEX index_current_operators_on_geometry ON public.current_operators USING gist (geometry);
-CREATE UNIQUE INDEX index_current_operators_on_onestop_id ON public.current_operators USING btree (onestop_id);
-CREATE INDEX index_current_operators_on_tags ON public.current_operators USING btree (tags);
-CREATE INDEX index_current_operators_on_updated_at ON public.current_operators USING btree (updated_at);
-CREATE UNIQUE INDEX index_feed_states_on_feed_id ON public.feed_states USING btree (feed_id);
-CREATE UNIQUE INDEX index_feed_states_on_feed_priority ON public.feed_states USING btree (feed_priority);
-CREATE UNIQUE INDEX index_feed_states_on_feed_version_id ON public.feed_states USING btree (feed_version_id);
-CREATE INDEX index_feed_version_geometries_on_centroid ON public.tl_feed_version_geometries USING gist (centroid);
-CREATE INDEX index_feed_version_geometries_on_geometry ON public.tl_feed_version_geometries USING gist (geometry);
-CREATE UNIQUE INDEX index_feed_version_geometries_unique ON public.tl_feed_version_geometries USING btree (feed_version_id);
-CREATE UNIQUE INDEX index_feed_version_gtfs_imports_on_feed_version_id ON public.feed_version_gtfs_imports USING btree (feed_version_id);
-CREATE INDEX index_feed_version_gtfs_imports_on_success ON public.feed_version_gtfs_imports USING btree (success);
-CREATE INDEX index_feed_versions_on_earliest_calendar_date ON public.feed_versions USING btree (earliest_calendar_date);
-CREATE INDEX index_feed_versions_on_feed_type_and_feed_id ON public.feed_versions USING btree (feed_type, feed_id);
-CREATE INDEX index_feed_versions_on_latest_calendar_date ON public.feed_versions USING btree (latest_calendar_date);
-CREATE INDEX index_gtfs_agencies_on_agency_id ON public.gtfs_agencies USING btree (agency_id);
-CREATE INDEX index_gtfs_agencies_on_agency_name ON public.gtfs_agencies USING btree (agency_name);
-CREATE UNIQUE INDEX index_gtfs_agencies_unique ON public.gtfs_agencies USING btree (feed_version_id, agency_id);
-CREATE INDEX index_gtfs_calendar_dates_on_date ON public.gtfs_calendar_dates USING btree (date);
-CREATE INDEX index_gtfs_calendar_dates_on_exception_type ON public.gtfs_calendar_dates USING btree (exception_type);
-CREATE INDEX index_gtfs_calendar_dates_on_feed_version_id ON public.gtfs_calendar_dates USING btree (feed_version_id);
-CREATE INDEX index_gtfs_calendar_dates_on_service_id ON public.gtfs_calendar_dates USING btree (service_id);
-CREATE INDEX index_gtfs_calendars_on_end_date ON public.gtfs_calendars USING btree (end_date);
-CREATE UNIQUE INDEX index_gtfs_calendars_on_feed_version_id_and_service_id ON public.gtfs_calendars USING btree (feed_version_id, service_id);
-CREATE INDEX index_gtfs_calendars_on_friday ON public.gtfs_calendars USING btree (friday);
-CREATE INDEX index_gtfs_calendars_on_monday ON public.gtfs_calendars USING btree (monday);
-CREATE INDEX index_gtfs_calendars_on_saturday ON public.gtfs_calendars USING btree (saturday);
-CREATE INDEX index_gtfs_calendars_on_service_id ON public.gtfs_calendars USING btree (service_id);
-CREATE INDEX index_gtfs_calendars_on_start_date ON public.gtfs_calendars USING btree (start_date);
-CREATE INDEX index_gtfs_calendars_on_sunday ON public.gtfs_calendars USING btree (sunday);
-CREATE INDEX index_gtfs_calendars_on_thursday ON public.gtfs_calendars USING btree (thursday);
-CREATE INDEX index_gtfs_calendars_on_tuesday ON public.gtfs_calendars USING btree (tuesday);
-CREATE INDEX index_gtfs_calendars_on_wednesday ON public.gtfs_calendars USING btree (wednesday);
-CREATE INDEX index_gtfs_fare_attributes_on_agency_id ON public.gtfs_fare_attributes USING btree (agency_id);
-CREATE INDEX index_gtfs_fare_attributes_on_fare_id ON public.gtfs_fare_attributes USING btree (fare_id);
-CREATE UNIQUE INDEX index_gtfs_fare_attributes_unique ON public.gtfs_fare_attributes USING btree (feed_version_id, fare_id);
-CREATE INDEX index_gtfs_fare_rules_on_fare_id ON public.gtfs_fare_rules USING btree (fare_id);
-CREATE INDEX index_gtfs_fare_rules_on_feed_version_id ON public.gtfs_fare_rules USING btree (feed_version_id);
-CREATE INDEX index_gtfs_fare_rules_on_route_id ON public.gtfs_fare_rules USING btree (route_id);
-CREATE INDEX index_gtfs_frequencies_on_feed_version_id ON public.gtfs_frequencies USING btree (feed_version_id);
-CREATE INDEX index_gtfs_frequencies_on_trip_id ON public.gtfs_frequencies USING btree (trip_id);
-CREATE UNIQUE INDEX index_gtfs_levels_unique ON public.gtfs_levels USING btree (feed_version_id, level_id);
-CREATE INDEX index_gtfs_pathways_on_from_stop_id ON public.gtfs_pathways USING btree (from_stop_id);
-CREATE INDEX index_gtfs_pathways_on_level_id ON public.gtfs_levels USING btree (level_id);
-CREATE INDEX index_gtfs_pathways_on_pathway_id ON public.gtfs_pathways USING btree (pathway_id);
-CREATE INDEX index_gtfs_pathways_on_to_stop_id ON public.gtfs_pathways USING btree (to_stop_id);
-CREATE UNIQUE INDEX index_gtfs_pathways_unique ON public.gtfs_pathways USING btree (feed_version_id, pathway_id);
-CREATE INDEX index_gtfs_routes_on_agency_id ON public.gtfs_routes USING btree (agency_id);
-CREATE INDEX index_gtfs_routes_on_feed_version_id_agency_id ON public.gtfs_routes USING btree (feed_version_id, id, agency_id);
-CREATE INDEX index_gtfs_routes_on_route_desc ON public.gtfs_routes USING btree (route_desc);
-CREATE INDEX index_gtfs_routes_on_route_id ON public.gtfs_routes USING btree (route_id);
-CREATE INDEX index_gtfs_routes_on_route_long_name ON public.gtfs_routes USING btree (route_long_name);
-CREATE INDEX index_gtfs_routes_on_route_short_name ON public.gtfs_routes USING btree (route_short_name);
-CREATE INDEX index_gtfs_routes_on_route_type ON public.gtfs_routes USING btree (route_type);
-CREATE UNIQUE INDEX index_gtfs_routes_unique ON public.gtfs_routes USING btree (feed_version_id, route_id);
-CREATE INDEX index_gtfs_shapes_on_generated ON public.gtfs_shapes USING btree (generated);
-CREATE INDEX index_gtfs_shapes_on_geometry ON public.gtfs_shapes USING gist (geometry);
-CREATE INDEX index_gtfs_shapes_on_shape_id ON public.gtfs_shapes USING btree (shape_id);
-CREATE UNIQUE INDEX index_gtfs_shapes_unique ON public.gtfs_shapes USING btree (feed_version_id, shape_id);
-CREATE INDEX index_gtfs_stops_on_geometry ON public.gtfs_stops USING gist (geometry);
-CREATE INDEX index_gtfs_stops_on_location_type ON public.gtfs_stops USING btree (location_type);
-CREATE INDEX index_gtfs_stops_on_parent_station ON public.gtfs_stops USING btree (parent_station);
-CREATE INDEX index_gtfs_stops_on_stop_code ON public.gtfs_stops USING btree (stop_code);
-CREATE INDEX index_gtfs_stops_on_stop_desc ON public.gtfs_stops USING btree (stop_desc);
-CREATE INDEX index_gtfs_stops_on_stop_id ON public.gtfs_stops USING btree (stop_id);
-CREATE INDEX index_gtfs_stops_on_stop_name ON public.gtfs_stops USING btree (stop_name);
-CREATE UNIQUE INDEX index_gtfs_stops_unique ON public.gtfs_stops USING btree (feed_version_id, stop_id);
-CREATE INDEX index_gtfs_transfers_on_feed_version_id ON public.gtfs_transfers USING btree (feed_version_id);
-CREATE INDEX index_gtfs_transfers_on_from_stop_id ON public.gtfs_transfers USING btree (from_stop_id);
-CREATE INDEX index_gtfs_transfers_on_to_stop_id ON public.gtfs_transfers USING btree (to_stop_id);
-CREATE INDEX index_gtfs_trips_on_route_id ON public.gtfs_trips USING btree (route_id);
-CREATE INDEX index_gtfs_trips_on_service_id ON public.gtfs_trips USING btree (service_id);
-CREATE INDEX index_gtfs_trips_on_shape_id ON public.gtfs_trips USING btree (shape_id);
-CREATE INDEX index_gtfs_trips_on_trip_headsign ON public.gtfs_trips USING btree (trip_headsign);
-CREATE INDEX index_gtfs_trips_on_trip_id ON public.gtfs_trips USING btree (trip_id);
-CREATE INDEX index_gtfs_trips_on_trip_short_name ON public.gtfs_trips USING btree (trip_short_name);
-CREATE UNIQUE INDEX index_gtfs_trips_unique ON public.gtfs_trips USING btree (feed_version_id, trip_id);
-CREATE INDEX index_route_geometries_on_centroid ON public.tl_route_geometries USING gist (centroid);
-CREATE INDEX index_route_geometries_on_feed_version_id ON public.tl_route_geometries USING btree (feed_version_id);
-CREATE INDEX index_route_geometries_on_geometry ON public.tl_route_geometries USING gist (geometry);
-CREATE INDEX index_route_geometries_on_shape_id ON public.tl_route_geometries USING btree (shape_id);
-CREATE UNIQUE INDEX index_route_geometries_unique ON public.tl_route_geometries USING btree (route_id, direction_id);
-CREATE INDEX index_route_stops_on_agency_id ON public.tl_route_stops USING btree (agency_id);
-CREATE INDEX index_route_stops_on_feed_version_id ON public.tl_route_stops USING btree (feed_version_id);
-CREATE INDEX index_route_stops_on_route_id ON public.tl_route_stops USING btree (route_id);
-CREATE INDEX index_route_stops_on_stop_id ON public.tl_route_stops USING btree (stop_id);
-CREATE INDEX ne_10m_admin_1_states_provinces_geometry_geom_idx ON public.ne_10m_admin_1_states_provinces USING gist (geometry);
-CREATE INDEX ne_10m_populated_places_geometry_geom_idx ON public.ne_10m_populated_places USING gist (geometry);
-CREATE INDEX route_headways_feed_version_id_idx ON public.tl_route_headways USING btree (feed_version_id);
-CREATE UNIQUE INDEX tl_agency_onestop_ids_agency_id_idx ON public.tl_agency_onestop_ids USING btree (agency_id);
-CREATE INDEX tl_agency_onestop_ids_feed_version_id_idx ON public.tl_agency_onestop_ids USING btree (feed_version_id);
-CREATE INDEX tl_agency_onestop_ids_onestop_id_idx ON public.tl_agency_onestop_ids USING btree (onestop_id);
-CREATE INDEX tl_agency_places_adm0name_idx ON public.tl_agency_places USING gin (adm0name public.gin_trgm_ops);
-CREATE INDEX tl_agency_places_adm1name_idx ON public.tl_agency_places USING gin (adm1name public.gin_trgm_ops);
-CREATE INDEX tl_agency_places_name_idx ON public.tl_agency_places USING gin (name public.gin_trgm_ops);
-CREATE UNIQUE INDEX tl_census_datasets_dataset_name_idx ON public.tl_census_datasets USING btree (dataset_name);
-CREATE INDEX tl_census_fields_field_name_idx ON public.tl_census_fields USING btree (field_name);
-CREATE UNIQUE INDEX tl_census_fields_table_id_field_name_idx ON public.tl_census_fields USING btree (table_id, field_name);
-CREATE INDEX tl_census_geographies_geoid_idx ON public.tl_census_geographies USING btree (geoid);
-CREATE INDEX tl_census_geographies_geometry_idx ON public.tl_census_geographies USING gist (geometry);
-CREATE INDEX tl_census_geographies_layer_name_idx ON public.tl_census_geographies USING btree (layer_name);
-CREATE INDEX tl_census_geographies_source_id_idx ON public.tl_census_geographies USING btree (source_id);
-CREATE INDEX tl_census_sources_dataset_id_idx ON public.tl_census_sources USING btree (dataset_id);
-CREATE INDEX tl_census_tables_dataset_id_idx ON public.tl_census_tables USING btree (dataset_id);
-CREATE UNIQUE INDEX tl_census_tables_dataset_id_table_name_idx ON public.tl_census_tables USING btree (dataset_id, table_name);
-CREATE INDEX tl_census_tables_table_name_idx ON public.tl_census_tables USING btree (table_name);
-CREATE UNIQUE INDEX tl_census_values_geography_id_table_id_idx ON public.tl_census_values USING btree (geography_id, table_id);
-CREATE INDEX tl_ext_gtfs_stops_feed_version_id_idx ON public.tl_ext_gtfs_stops USING btree (feed_version_id);
-CREATE INDEX tl_ext_gtfs_stops_target_feed_onestop_id_idx ON public.tl_ext_gtfs_stops USING btree (target_feed_onestop_id);
-CREATE INDEX tl_ext_gtfs_stops_target_stop_id_idx ON public.tl_ext_gtfs_stops USING btree (target_stop_id);
-CREATE INDEX tl_route_geometries_combined_geometry_idx ON public.tl_route_geometries USING gist (combined_geometry);
-CREATE INDEX tl_route_onestop_ids_feed_version_id_idx ON public.tl_route_onestop_ids USING btree (feed_version_id);
-CREATE INDEX tl_route_onestop_ids_onestop_id_idx ON public.tl_route_onestop_ids USING btree (onestop_id);
-CREATE UNIQUE INDEX tl_route_onestop_ids_route_id_idx ON public.tl_route_onestop_ids USING btree (route_id);
-CREATE INDEX tl_stop_external_references_feed_version_id_idx ON public.tl_stop_external_references USING btree (feed_version_id);
-CREATE INDEX tl_stop_external_references_target_feed_onestop_id_idx ON public.tl_stop_external_references USING btree (target_feed_onestop_id);
-CREATE INDEX tl_stop_external_references_target_stop_id_idx ON public.tl_stop_external_references USING btree (target_stop_id);
-CREATE INDEX tl_stop_onestop_ids_feed_version_id_idx ON public.tl_stop_onestop_ids USING btree (feed_version_id);
-CREATE INDEX tl_stop_onestop_ids_onestop_id_idx ON public.tl_stop_onestop_ids USING btree (onestop_id);
-CREATE UNIQUE INDEX tl_stop_onestop_ids_stop_id_idx ON public.tl_stop_onestop_ids USING btree (stop_id);
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_0_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_0_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_0_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_0_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_1_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_1_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_1_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_1_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_2_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_2_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_2_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_2_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_3_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_3_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_3_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_3_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_4_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_4_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_4_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_4_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_5_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_5_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_5_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_5_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_6_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_6_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_6_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_6_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_7_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_7_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_7_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_7_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_8_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_8_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_8_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_8_trip_id_idx;
-ALTER INDEX public.gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_9_feed_version_id_trip_id_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_pkey1 ATTACH PARTITION public.gtfs_stop_times_9_pkey;
-ALTER INDEX public.gtfs_stop_times_stop_id_idx ATTACH PARTITION public.gtfs_stop_times_9_stop_id_idx;
-ALTER INDEX public.gtfs_stop_times_trip_id_idx ATTACH PARTITION public.gtfs_stop_times_9_trip_id_idx;
-ALTER TABLE ONLY public.current_operators_in_feed
-    ADD CONSTRAINT current_operators_in_feed_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.current_operators_in_feed
-    ADD CONSTRAINT current_operators_in_feed_feed_id_fkey FOREIGN KEY (feed_id) REFERENCES public.current_feeds(id);
-ALTER TABLE ONLY public.current_operators_in_feed
-    ADD CONSTRAINT current_operators_in_feed_operator_id_fkey FOREIGN KEY (operator_id) REFERENCES public.current_operators(id);
-ALTER TABLE ONLY public.ext_faresv2_areas
-    ADD CONSTRAINT ext_faresv2_areas_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_faresv2_fare_capping
-    ADD CONSTRAINT ext_faresv2_fare_capping_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_faresv2_fare_containers
-    ADD CONSTRAINT ext_faresv2_fare_containers_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_faresv2_fare_leg_rules
-    ADD CONSTRAINT ext_faresv2_fare_leg_rules_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_faresv2_fare_products
-    ADD CONSTRAINT ext_faresv2_fare_products_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_faresv2_fare_timeframes
-    ADD CONSTRAINT ext_faresv2_fare_timeframes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_faresv2_fare_transfer_rules
-    ADD CONSTRAINT ext_faresv2_fare_transfer_rules_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_faresv2_rider_categories
-    ADD CONSTRAINT ext_faresv2_rider_categories_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_calendar_attributes
-    ADD CONSTRAINT ext_plus_calendar_attributes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_calendar_attributes
-    ADD CONSTRAINT ext_plus_calendar_attributes_service_id_fkey FOREIGN KEY (service_id) REFERENCES public.gtfs_calendars(id);
-ALTER TABLE ONLY public.ext_plus_directions
-    ADD CONSTRAINT ext_plus_directions_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_directions
-    ADD CONSTRAINT ext_plus_directions_route_id_fkey FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.ext_plus_fare_rider_categories
-    ADD CONSTRAINT ext_plus_fare_rider_categories_fare_id_fkey FOREIGN KEY (fare_id) REFERENCES public.gtfs_fare_attributes(id);
-ALTER TABLE ONLY public.ext_plus_fare_rider_categories
-    ADD CONSTRAINT ext_plus_fare_rider_categories_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_farezone_attributes
-    ADD CONSTRAINT ext_plus_farezone_attributes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_realtime_routes
-    ADD CONSTRAINT ext_plus_realtime_routes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_realtime_routes
-    ADD CONSTRAINT ext_plus_realtime_routes_route_id_fkey FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.ext_plus_realtime_stops
-    ADD CONSTRAINT ext_plus_realtime_stops_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_realtime_stops
-    ADD CONSTRAINT ext_plus_realtime_stops_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.ext_plus_realtime_stops
-    ADD CONSTRAINT ext_plus_realtime_stops_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.gtfs_trips(id);
-ALTER TABLE ONLY public.ext_plus_realtime_trips
-    ADD CONSTRAINT ext_plus_realtime_trips_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_realtime_trips
-    ADD CONSTRAINT ext_plus_realtime_trips_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.gtfs_trips(id);
-ALTER TABLE ONLY public.ext_plus_rider_categories
-    ADD CONSTRAINT ext_plus_rider_categories_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.ext_plus_rider_categories
-    ADD CONSTRAINT ext_plus_rider_categories_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_stop_attributes
-    ADD CONSTRAINT ext_plus_stop_attributes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_stop_attributes
-    ADD CONSTRAINT ext_plus_stop_attributes_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.ext_plus_timepoints
-    ADD CONSTRAINT ext_plus_timepoints_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.ext_plus_timepoints
-    ADD CONSTRAINT ext_plus_timepoints_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.ext_plus_timepoints
-    ADD CONSTRAINT ext_plus_timepoints_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.gtfs_trips(id);
-ALTER TABLE ONLY public.feed_version_file_infos
-    ADD CONSTRAINT feed_version_file_infos_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.feed_version_service_levels
-    ADD CONSTRAINT feed_version_service_levels_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_trips
-    ADD CONSTRAINT fk_rails_05ead08753 FOREIGN KEY (shape_id) REFERENCES public.gtfs_shapes(id);
-ALTER TABLE ONLY public.tl_route_headways
-    ADD CONSTRAINT fk_rails_078ffc5894 FOREIGN KEY (service_id) REFERENCES public.gtfs_calendars(id);
-ALTER TABLE ONLY public.gtfs_transfers
-    ADD CONSTRAINT fk_rails_0cc6ff288a FOREIGN KEY (from_stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.tl_route_headways
-    ADD CONSTRAINT fk_rails_19cb5c8c5c FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_agency_geometries
-    ADD CONSTRAINT fk_rails_1bfa787783 FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.tl_route_stops
-    ADD CONSTRAINT fk_rails_1dee96ee31 FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.tl_route_stops
-    ADD CONSTRAINT fk_rails_1f4cc828f8 FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.feed_version_gtfs_imports
-    ADD CONSTRAINT fk_rails_2d141782c9 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_fare_rules
-    ADD CONSTRAINT fk_rails_33e9869c97 FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.gtfs_stops
-    ADD CONSTRAINT fk_rails_3a83952954 FOREIGN KEY (parent_station) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.gtfs_calendars
-    ADD CONSTRAINT fk_rails_42538db9b2 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.feed_states
-    ADD CONSTRAINT fk_rails_5189447149 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_frequencies
-    ADD CONSTRAINT fk_rails_6e6295037f FOREIGN KEY (trip_id) REFERENCES public.gtfs_trips(id);
-ALTER TABLE ONLY public.tl_route_geometries
-    ADD CONSTRAINT fk_rails_71ddc895e1 FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.tl_agency_places
-    ADD CONSTRAINT fk_rails_736d85abf8 FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.tl_agency_places
-    ADD CONSTRAINT fk_rails_782a6056d8 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_calendar_dates
-    ADD CONSTRAINT fk_rails_7a365f570b FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_feed_version_geometries
-    ADD CONSTRAINT fk_rails_8398615a04 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_shapes
-    ADD CONSTRAINT fk_rails_84a74e83d8 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_stops
-    ADD CONSTRAINT fk_rails_860ffa5a40 FOREIGN KEY (level_id) REFERENCES public.gtfs_levels(id);
-ALTER TABLE ONLY public.tl_route_stops
-    ADD CONSTRAINT fk_rails_86271126ad FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_agency_geometries
-    ADD CONSTRAINT fk_rails_8a1bd61db9 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_fare_attributes
-    ADD CONSTRAINT fk_rails_8a3ca847de FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_pathways
-    ADD CONSTRAINT fk_rails_8d7bf46256 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_route_headways
-    ADD CONSTRAINT fk_rails_93324ef20d FOREIGN KEY (selected_stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.feed_states
-    ADD CONSTRAINT fk_rails_99eaedcf98 FOREIGN KEY (feed_id) REFERENCES public.current_feeds(id);
-ALTER TABLE ONLY public.tl_route_headways
-    ADD CONSTRAINT fk_rails_9a487f871b FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.gtfs_transfers
-    ADD CONSTRAINT fk_rails_a030c4a2a9 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_routes
-    ADD CONSTRAINT fk_rails_a5ff5a2ceb FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_pathways
-    ADD CONSTRAINT fk_rails_a668e1e0ac FOREIGN KEY (to_stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.gtfs_agencies
-    ADD CONSTRAINT fk_rails_a7e0c4685b FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_trips
-    ADD CONSTRAINT fk_rails_a839da033a FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_fare_attributes
-    ADD CONSTRAINT fk_rails_b096f74e03 FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.feed_versions
-    ADD CONSTRAINT fk_rails_b5365c3cf3 FOREIGN KEY (feed_id) REFERENCES public.current_feeds(id);
-ALTER TABLE ONLY public.tl_route_geometries
-    ADD CONSTRAINT fk_rails_b9fc0ae4ad FOREIGN KEY (shape_id) REFERENCES public.gtfs_shapes(id);
-ALTER TABLE ONLY public.gtfs_fare_rules
-    ADD CONSTRAINT fk_rails_bd7d178423 FOREIGN KEY (fare_id) REFERENCES public.gtfs_fare_attributes(id);
-ALTER TABLE ONLY public.gtfs_fare_rules
-    ADD CONSTRAINT fk_rails_c336ea9f1a FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_levels
-    ADD CONSTRAINT fk_rails_c5fba46e47 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_route_geometries
-    ADD CONSTRAINT fk_rails_c858a218e2 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_calendar_dates
-    ADD CONSTRAINT fk_rails_ca504bc01f FOREIGN KEY (service_id) REFERENCES public.gtfs_calendars(id);
-ALTER TABLE ONLY public.tl_route_stops
-    ADD CONSTRAINT fk_rails_cc9fde6bb7 FOREIGN KEY (stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.gtfs_stops
-    ADD CONSTRAINT fk_rails_cf4bc79180 FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_frequencies
-    ADD CONSTRAINT fk_rails_d1b468024b FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_trips
-    ADD CONSTRAINT fk_rails_d2c6f99d5e FOREIGN KEY (service_id) REFERENCES public.gtfs_calendars(id);
-ALTER TABLE ONLY public.gtfs_pathways
-    ADD CONSTRAINT fk_rails_df846a6b54 FOREIGN KEY (from_stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.gtfs_transfers
-    ADD CONSTRAINT fk_rails_e1c56f7da4 FOREIGN KEY (to_stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.gtfs_routes
-    ADD CONSTRAINT fk_rails_e5eb0f1573 FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.gtfs_feed_infos
-    ADD CONSTRAINT fk_rails_eb863abbac FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.gtfs_trips
-    ADD CONSTRAINT fk_rails_mid93550f50 FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.gtfs_levels
-    ADD CONSTRAINT gtfs_levels_parent_station_fkey FOREIGN KEY (parent_station) REFERENCES public.gtfs_stops(id);
-ALTER TABLE public.gtfs_stop_times
-    ADD CONSTRAINT gtfs_stop_times_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE public.gtfs_stop_times
-    ADD CONSTRAINT gtfs_stop_times_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE public.gtfs_stop_times
-    ADD CONSTRAINT gtfs_stop_times_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.gtfs_trips(id);
-ALTER TABLE ONLY public.tl_agency_onestop_ids
-    ADD CONSTRAINT tl_agency_onestop_ids_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES public.gtfs_agencies(id);
-ALTER TABLE ONLY public.tl_agency_onestop_ids
-    ADD CONSTRAINT tl_agency_onestop_ids_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_census_fields
-    ADD CONSTRAINT tl_census_fields_table_id_fkey FOREIGN KEY (table_id) REFERENCES public.tl_census_tables(id);
-ALTER TABLE ONLY public.tl_census_geographies
-    ADD CONSTRAINT tl_census_geographies_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.tl_census_sources(id);
-ALTER TABLE ONLY public.tl_census_sources
-    ADD CONSTRAINT tl_census_sources_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES public.tl_census_datasets(id);
-ALTER TABLE ONLY public.tl_census_tables
-    ADD CONSTRAINT tl_census_tables_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES public.tl_census_datasets(id);
-ALTER TABLE ONLY public.tl_census_values
-    ADD CONSTRAINT tl_census_values_geography_id_fkey FOREIGN KEY (geography_id) REFERENCES public.tl_census_geographies(id);
-ALTER TABLE ONLY public.tl_census_values
-    ADD CONSTRAINT tl_census_values_table_id_fkey FOREIGN KEY (table_id) REFERENCES public.tl_census_tables(id);
-ALTER TABLE ONLY public.tl_ext_fare_networks
-    ADD CONSTRAINT tl_ext_fare_networks_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_ext_gtfs_stops
-    ADD CONSTRAINT tl_ext_gtfs_stops_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_ext_gtfs_stops
-    ADD CONSTRAINT tl_ext_gtfs_stops_id_fkey FOREIGN KEY (id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.tl_route_onestop_ids
-    ADD CONSTRAINT tl_route_onestop_ids_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_route_onestop_ids
-    ADD CONSTRAINT tl_route_onestop_ids_route_id_fkey FOREIGN KEY (route_id) REFERENCES public.gtfs_routes(id);
-ALTER TABLE ONLY public.tl_stop_external_references
-    ADD CONSTRAINT tl_stop_external_references_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_stop_external_references
-    ADD CONSTRAINT tl_stop_external_references_id_fkey FOREIGN KEY (id) REFERENCES public.gtfs_stops(id);
-ALTER TABLE ONLY public.tl_stop_onestop_ids
-    ADD CONSTRAINT tl_stop_onestop_ids_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES public.feed_versions(id);
-ALTER TABLE ONLY public.tl_stop_onestop_ids
-    ADD CONSTRAINT tl_stop_onestop_ids_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES public.gtfs_stops(id);
+CREATE INDEX "#c_operators_cu_in_changeset_id_index" ON current_operators USING btree (created_or_updated_in_changeset_id);
+CREATE INDEX agency_places_agency_id_idx ON tl_agency_places USING btree (agency_id);
+CREATE INDEX agency_places_best_match_idx ON tl_agency_places USING btree (best_match);
+CREATE INDEX agency_places_feed_version_id_idx ON tl_agency_places USING btree (feed_version_id);
+CREATE INDEX current_feeds_feed_tags_idx ON current_feeds USING btree (feed_tags);
+CREATE INDEX current_feeds_textsearch_idx ON current_feeds USING gin (textsearch);
+CREATE INDEX current_oif ON current_operators_in_feed USING btree (created_or_updated_in_changeset_id);
+CREATE INDEX current_operators_in_feed_agency_id_idx ON current_operators_in_feed USING btree (agency_id);
+CREATE INDEX current_operators_in_feed_resolved_gtfs_agency_id_idx ON current_operators_in_feed USING btree (resolved_gtfs_agency_id);
+CREATE INDEX current_operators_in_feed_resolved_name_idx ON current_operators_in_feed USING btree (resolved_name);
+CREATE INDEX current_operators_in_feed_resolved_onestop_id_idx ON current_operators_in_feed USING btree (resolved_onestop_id);
+CREATE INDEX current_operators_in_feed_resolved_places_idx ON current_operators_in_feed USING btree (resolved_places);
+CREATE INDEX current_operators_in_feed_resolved_short_name_idx ON current_operators_in_feed USING btree (resolved_short_name);
+CREATE INDEX current_operators_in_feed_textsearch_idx ON current_operators_in_feed USING gin (textsearch);
+CREATE INDEX current_operators_operator_tags_idx ON current_operators USING btree (operator_tags);
+CREATE INDEX current_operators_textsearch_idx ON current_operators USING gin (textsearch);
+CREATE INDEX ext_plus_calendar_attributes_feed_version_id_idx ON ext_plus_calendar_attributes USING btree (feed_version_id);
+CREATE INDEX ext_plus_calendar_attributes_service_id_idx ON ext_plus_calendar_attributes USING btree (service_id);
+CREATE INDEX ext_plus_directions_feed_version_id_idx ON ext_plus_directions USING btree (feed_version_id);
+CREATE INDEX ext_plus_directions_route_id_idx ON ext_plus_directions USING btree (route_id);
+CREATE INDEX ext_plus_fare_rider_categories_fare_id_idx ON ext_plus_fare_rider_categories USING btree (fare_id);
+CREATE INDEX ext_plus_fare_rider_categories_feed_version_id_idx ON ext_plus_fare_rider_categories USING btree (feed_version_id);
+CREATE INDEX ext_plus_fare_rider_categories_rider_category_id_idx ON ext_plus_fare_rider_categories USING btree (rider_category_id);
+CREATE INDEX ext_plus_farezone_attributes_feed_version_id_idx ON ext_plus_farezone_attributes USING btree (feed_version_id);
+CREATE INDEX ext_plus_realtime_routes_feed_version_id_idx ON ext_plus_realtime_routes USING btree (feed_version_id);
+CREATE INDEX ext_plus_realtime_routes_route_id_idx ON ext_plus_realtime_routes USING btree (route_id);
+CREATE INDEX ext_plus_realtime_stops_feed_version_id_idx ON ext_plus_realtime_stops USING btree (feed_version_id);
+CREATE INDEX ext_plus_realtime_stops_stop_id_idx ON ext_plus_realtime_stops USING btree (stop_id);
+CREATE INDEX ext_plus_realtime_stops_trip_id_idx ON ext_plus_realtime_stops USING btree (trip_id);
+CREATE INDEX ext_plus_realtime_trips_feed_version_id_idx ON ext_plus_realtime_trips USING btree (feed_version_id);
+CREATE INDEX ext_plus_realtime_trips_trip_id_idx ON ext_plus_realtime_trips USING btree (trip_id);
+CREATE INDEX ext_plus_rider_categories_agency_id_idx ON ext_plus_rider_categories USING btree (agency_id);
+CREATE INDEX ext_plus_rider_categories_feed_version_id_idx ON ext_plus_rider_categories USING btree (feed_version_id);
+CREATE INDEX ext_plus_stop_attributes_feed_version_id_idx ON ext_plus_stop_attributes USING btree (feed_version_id);
+CREATE INDEX ext_plus_timepoints_feed_version_id_idx ON ext_plus_timepoints USING btree (feed_version_id);
+CREATE INDEX ext_plus_timepoints_stop_id_idx ON ext_plus_timepoints USING btree (stop_id);
+CREATE INDEX ext_plus_timepoints_trip_id_idx ON ext_plus_timepoints USING btree (trip_id);
+CREATE INDEX feed_version_file_infos_feed_version_id_idx ON feed_version_file_infos USING btree (feed_version_id);
+CREATE INDEX feed_version_file_infos_name_idx ON feed_version_file_infos USING btree (name);
+CREATE INDEX feed_version_file_infos_sha1_idx ON feed_version_file_infos USING btree (sha1);
+CREATE INDEX feed_version_service_levels_end_date_idx ON feed_version_service_levels USING btree (end_date);
+CREATE INDEX feed_version_service_levels_feed_version_id_idx ON feed_version_service_levels USING btree (feed_version_id);
+CREATE UNIQUE INDEX feed_version_service_levels_feed_version_id_route_id_start__idx ON feed_version_service_levels USING btree (feed_version_id, route_id, start_date, end_date);
+CREATE INDEX feed_version_service_levels_route_id_idx ON feed_version_service_levels USING btree (route_id);
+CREATE INDEX feed_version_service_levels_start_date_idx ON feed_version_service_levels USING btree (start_date);
+CREATE INDEX feed_versions_fetched_at_idx ON feed_versions USING btree (fetched_at);
+CREATE INDEX gtfs_agencies_textsearch_idx ON gtfs_agencies USING gin (textsearch);
+CREATE INDEX gtfs_calendar_dates_service_id_exception_type_date_idx ON gtfs_calendar_dates USING btree (service_id, exception_type, date);
+CREATE INDEX gtfs_feed_infos_feed_version_id_idx ON gtfs_feed_infos USING btree (feed_version_id);
+CREATE INDEX gtfs_routes_textsearch_idx ON gtfs_routes USING gin (textsearch);
+CREATE INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ON ONLY gtfs_stop_times USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_0_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_0 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_stop_id_idx ON ONLY gtfs_stop_times USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_0_stop_id_idx ON gtfs_stop_times_0 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_trip_id_idx ON ONLY gtfs_stop_times USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_0_trip_id_idx ON gtfs_stop_times_0 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_1_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_1 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_1_stop_id_idx ON gtfs_stop_times_1 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_1_trip_id_idx ON gtfs_stop_times_1 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_2_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_2 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_2_stop_id_idx ON gtfs_stop_times_2 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_2_trip_id_idx ON gtfs_stop_times_2 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_3_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_3 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_3_stop_id_idx ON gtfs_stop_times_3 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_3_trip_id_idx ON gtfs_stop_times_3 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_4_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_4 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_4_stop_id_idx ON gtfs_stop_times_4 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_4_trip_id_idx ON gtfs_stop_times_4 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_5_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_5 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_5_stop_id_idx ON gtfs_stop_times_5 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_5_trip_id_idx ON gtfs_stop_times_5 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_6_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_6 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_6_stop_id_idx ON gtfs_stop_times_6 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_6_trip_id_idx ON gtfs_stop_times_6 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_7_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_7 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_7_stop_id_idx ON gtfs_stop_times_7 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_7_trip_id_idx ON gtfs_stop_times_7 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_8_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_8 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_8_stop_id_idx ON gtfs_stop_times_8 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_8_trip_id_idx ON gtfs_stop_times_8 USING btree (trip_id);
+CREATE INDEX gtfs_stop_times_9_feed_version_id_trip_id_stop_id_idx ON gtfs_stop_times_9 USING btree (feed_version_id, trip_id, stop_id);
+CREATE INDEX gtfs_stop_times_9_stop_id_idx ON gtfs_stop_times_9 USING btree (stop_id);
+CREATE INDEX gtfs_stop_times_9_trip_id_idx ON gtfs_stop_times_9 USING btree (trip_id);
+CREATE INDEX gtfs_stops_textsearch_idx ON gtfs_stops USING gin (textsearch);
+CREATE INDEX gtfs_trips_journey_pattern_id_idx ON gtfs_trips USING btree (journey_pattern_id);
+CREATE INDEX index_agency_geometries_on_centroid ON tl_agency_geometries USING gist (centroid);
+CREATE INDEX index_agency_geometries_on_feed_version_id ON tl_agency_geometries USING btree (feed_version_id);
+CREATE INDEX index_agency_geometries_on_geometry ON tl_agency_geometries USING gist (geometry);
+CREATE UNIQUE INDEX index_agency_geometries_unique ON tl_agency_geometries USING btree (agency_id);
+CREATE INDEX index_current_feeds_on_active_feed_version_id ON current_feeds USING btree (active_feed_version_id);
+CREATE INDEX index_current_feeds_on_auth ON current_feeds USING btree (auth);
+CREATE INDEX index_current_feeds_on_created_or_updated_in_changeset_id ON current_feeds USING btree (created_or_updated_in_changeset_id);
+CREATE INDEX index_current_feeds_on_geometry ON current_feeds USING gist (geometry);
+CREATE UNIQUE INDEX index_current_feeds_on_onestop_id ON current_feeds USING btree (onestop_id);
+CREATE INDEX index_current_feeds_on_urls ON current_feeds USING btree (urls);
+CREATE INDEX index_current_operators_in_feed_on_feed_id ON current_operators_in_feed USING btree (feed_id);
+CREATE INDEX index_current_operators_in_feed_on_operator_id ON current_operators_in_feed USING btree (operator_id);
+CREATE INDEX index_current_operators_on_geometry ON current_operators USING gist (geometry);
+CREATE UNIQUE INDEX index_current_operators_on_onestop_id ON current_operators USING btree (onestop_id);
+CREATE INDEX index_current_operators_on_tags ON current_operators USING btree (tags);
+CREATE INDEX index_current_operators_on_updated_at ON current_operators USING btree (updated_at);
+CREATE UNIQUE INDEX index_feed_states_on_feed_id ON feed_states USING btree (feed_id);
+CREATE UNIQUE INDEX index_feed_states_on_feed_priority ON feed_states USING btree (feed_priority);
+CREATE UNIQUE INDEX index_feed_states_on_feed_version_id ON feed_states USING btree (feed_version_id);
+CREATE INDEX index_feed_version_geometries_on_centroid ON tl_feed_version_geometries USING gist (centroid);
+CREATE INDEX index_feed_version_geometries_on_geometry ON tl_feed_version_geometries USING gist (geometry);
+CREATE UNIQUE INDEX index_feed_version_geometries_unique ON tl_feed_version_geometries USING btree (feed_version_id);
+CREATE UNIQUE INDEX index_feed_version_gtfs_imports_on_feed_version_id ON feed_version_gtfs_imports USING btree (feed_version_id);
+CREATE INDEX index_feed_version_gtfs_imports_on_success ON feed_version_gtfs_imports USING btree (success);
+CREATE INDEX index_feed_versions_on_earliest_calendar_date ON feed_versions USING btree (earliest_calendar_date);
+CREATE INDEX index_feed_versions_on_feed_type_and_feed_id ON feed_versions USING btree (feed_type, feed_id);
+CREATE INDEX index_feed_versions_on_latest_calendar_date ON feed_versions USING btree (latest_calendar_date);
+CREATE INDEX index_gtfs_agencies_on_agency_id ON gtfs_agencies USING btree (agency_id);
+CREATE INDEX index_gtfs_agencies_on_agency_name ON gtfs_agencies USING btree (agency_name);
+CREATE UNIQUE INDEX index_gtfs_agencies_unique ON gtfs_agencies USING btree (feed_version_id, agency_id);
+CREATE INDEX index_gtfs_calendar_dates_on_date ON gtfs_calendar_dates USING btree (date);
+CREATE INDEX index_gtfs_calendar_dates_on_exception_type ON gtfs_calendar_dates USING btree (exception_type);
+CREATE INDEX index_gtfs_calendar_dates_on_feed_version_id ON gtfs_calendar_dates USING btree (feed_version_id);
+CREATE INDEX index_gtfs_calendar_dates_on_service_id ON gtfs_calendar_dates USING btree (service_id);
+CREATE INDEX index_gtfs_calendars_on_end_date ON gtfs_calendars USING btree (end_date);
+CREATE UNIQUE INDEX index_gtfs_calendars_on_feed_version_id_and_service_id ON gtfs_calendars USING btree (feed_version_id, service_id);
+CREATE INDEX index_gtfs_calendars_on_friday ON gtfs_calendars USING btree (friday);
+CREATE INDEX index_gtfs_calendars_on_monday ON gtfs_calendars USING btree (monday);
+CREATE INDEX index_gtfs_calendars_on_saturday ON gtfs_calendars USING btree (saturday);
+CREATE INDEX index_gtfs_calendars_on_service_id ON gtfs_calendars USING btree (service_id);
+CREATE INDEX index_gtfs_calendars_on_start_date ON gtfs_calendars USING btree (start_date);
+CREATE INDEX index_gtfs_calendars_on_sunday ON gtfs_calendars USING btree (sunday);
+CREATE INDEX index_gtfs_calendars_on_thursday ON gtfs_calendars USING btree (thursday);
+CREATE INDEX index_gtfs_calendars_on_tuesday ON gtfs_calendars USING btree (tuesday);
+CREATE INDEX index_gtfs_calendars_on_wednesday ON gtfs_calendars USING btree (wednesday);
+CREATE INDEX index_gtfs_fare_attributes_on_agency_id ON gtfs_fare_attributes USING btree (agency_id);
+CREATE INDEX index_gtfs_fare_attributes_on_fare_id ON gtfs_fare_attributes USING btree (fare_id);
+CREATE UNIQUE INDEX index_gtfs_fare_attributes_unique ON gtfs_fare_attributes USING btree (feed_version_id, fare_id);
+CREATE INDEX index_gtfs_fare_rules_on_fare_id ON gtfs_fare_rules USING btree (fare_id);
+CREATE INDEX index_gtfs_fare_rules_on_feed_version_id ON gtfs_fare_rules USING btree (feed_version_id);
+CREATE INDEX index_gtfs_fare_rules_on_route_id ON gtfs_fare_rules USING btree (route_id);
+CREATE INDEX index_gtfs_frequencies_on_feed_version_id ON gtfs_frequencies USING btree (feed_version_id);
+CREATE INDEX index_gtfs_frequencies_on_trip_id ON gtfs_frequencies USING btree (trip_id);
+CREATE UNIQUE INDEX index_gtfs_levels_unique ON gtfs_levels USING btree (feed_version_id, level_id);
+CREATE INDEX index_gtfs_pathways_on_from_stop_id ON gtfs_pathways USING btree (from_stop_id);
+CREATE INDEX index_gtfs_pathways_on_level_id ON gtfs_levels USING btree (level_id);
+CREATE INDEX index_gtfs_pathways_on_pathway_id ON gtfs_pathways USING btree (pathway_id);
+CREATE INDEX index_gtfs_pathways_on_to_stop_id ON gtfs_pathways USING btree (to_stop_id);
+CREATE UNIQUE INDEX index_gtfs_pathways_unique ON gtfs_pathways USING btree (feed_version_id, pathway_id);
+CREATE INDEX index_gtfs_routes_on_agency_id ON gtfs_routes USING btree (agency_id);
+CREATE INDEX index_gtfs_routes_on_feed_version_id_agency_id ON gtfs_routes USING btree (feed_version_id, id, agency_id);
+CREATE INDEX index_gtfs_routes_on_route_desc ON gtfs_routes USING btree (route_desc);
+CREATE INDEX index_gtfs_routes_on_route_id ON gtfs_routes USING btree (route_id);
+CREATE INDEX index_gtfs_routes_on_route_long_name ON gtfs_routes USING btree (route_long_name);
+CREATE INDEX index_gtfs_routes_on_route_short_name ON gtfs_routes USING btree (route_short_name);
+CREATE INDEX index_gtfs_routes_on_route_type ON gtfs_routes USING btree (route_type);
+CREATE UNIQUE INDEX index_gtfs_routes_unique ON gtfs_routes USING btree (feed_version_id, route_id);
+CREATE INDEX index_gtfs_shapes_on_generated ON gtfs_shapes USING btree (generated);
+CREATE INDEX index_gtfs_shapes_on_geometry ON gtfs_shapes USING gist (geometry);
+CREATE INDEX index_gtfs_shapes_on_shape_id ON gtfs_shapes USING btree (shape_id);
+CREATE UNIQUE INDEX index_gtfs_shapes_unique ON gtfs_shapes USING btree (feed_version_id, shape_id);
+CREATE INDEX index_gtfs_stops_on_geometry ON gtfs_stops USING gist (geometry);
+CREATE INDEX index_gtfs_stops_on_location_type ON gtfs_stops USING btree (location_type);
+CREATE INDEX index_gtfs_stops_on_parent_station ON gtfs_stops USING btree (parent_station);
+CREATE INDEX index_gtfs_stops_on_stop_code ON gtfs_stops USING btree (stop_code);
+CREATE INDEX index_gtfs_stops_on_stop_desc ON gtfs_stops USING btree (stop_desc);
+CREATE INDEX index_gtfs_stops_on_stop_id ON gtfs_stops USING btree (stop_id);
+CREATE INDEX index_gtfs_stops_on_stop_name ON gtfs_stops USING btree (stop_name);
+CREATE UNIQUE INDEX index_gtfs_stops_unique ON gtfs_stops USING btree (feed_version_id, stop_id);
+CREATE INDEX index_gtfs_transfers_on_feed_version_id ON gtfs_transfers USING btree (feed_version_id);
+CREATE INDEX index_gtfs_transfers_on_from_stop_id ON gtfs_transfers USING btree (from_stop_id);
+CREATE INDEX index_gtfs_transfers_on_to_stop_id ON gtfs_transfers USING btree (to_stop_id);
+CREATE INDEX index_gtfs_trips_on_route_id ON gtfs_trips USING btree (route_id);
+CREATE INDEX index_gtfs_trips_on_service_id ON gtfs_trips USING btree (service_id);
+CREATE INDEX index_gtfs_trips_on_shape_id ON gtfs_trips USING btree (shape_id);
+CREATE INDEX index_gtfs_trips_on_trip_headsign ON gtfs_trips USING btree (trip_headsign);
+CREATE INDEX index_gtfs_trips_on_trip_id ON gtfs_trips USING btree (trip_id);
+CREATE INDEX index_gtfs_trips_on_trip_short_name ON gtfs_trips USING btree (trip_short_name);
+CREATE UNIQUE INDEX index_gtfs_trips_unique ON gtfs_trips USING btree (feed_version_id, trip_id);
+CREATE INDEX index_route_geometries_on_centroid ON tl_route_geometries USING gist (centroid);
+CREATE INDEX index_route_geometries_on_feed_version_id ON tl_route_geometries USING btree (feed_version_id);
+CREATE INDEX index_route_geometries_on_geometry ON tl_route_geometries USING gist (geometry);
+CREATE INDEX index_route_geometries_on_shape_id ON tl_route_geometries USING btree (shape_id);
+CREATE UNIQUE INDEX index_route_geometries_unique ON tl_route_geometries USING btree (route_id, direction_id);
+CREATE INDEX index_route_stops_on_agency_id ON tl_route_stops USING btree (agency_id);
+CREATE INDEX index_route_stops_on_feed_version_id ON tl_route_stops USING btree (feed_version_id);
+CREATE INDEX index_route_stops_on_route_id ON tl_route_stops USING btree (route_id);
+CREATE INDEX index_route_stops_on_stop_id ON tl_route_stops USING btree (stop_id);
+CREATE INDEX ne_10m_admin_1_states_provinces_geometry_geom_idx ON ne_10m_admin_1_states_provinces USING gist (geometry);
+CREATE INDEX ne_10m_populated_places_geometry_geom_idx ON ne_10m_populated_places USING gist (geometry);
+CREATE INDEX route_headways_feed_version_id_idx ON tl_route_headways USING btree (feed_version_id);
+CREATE UNIQUE INDEX tl_agency_onestop_ids_agency_id_idx ON tl_agency_onestop_ids USING btree (agency_id);
+CREATE INDEX tl_agency_onestop_ids_feed_version_id_idx ON tl_agency_onestop_ids USING btree (feed_version_id);
+CREATE INDEX tl_agency_onestop_ids_onestop_id_idx ON tl_agency_onestop_ids USING btree (onestop_id);
+CREATE INDEX tl_agency_places_adm0name_idx ON tl_agency_places USING gin (adm0name gin_trgm_ops);
+CREATE INDEX tl_agency_places_adm1name_idx ON tl_agency_places USING gin (adm1name gin_trgm_ops);
+CREATE INDEX tl_agency_places_name_idx ON tl_agency_places USING gin (name gin_trgm_ops);
+CREATE UNIQUE INDEX tl_census_datasets_dataset_name_idx ON tl_census_datasets USING btree (dataset_name);
+CREATE INDEX tl_census_fields_field_name_idx ON tl_census_fields USING btree (field_name);
+CREATE UNIQUE INDEX tl_census_fields_table_id_field_name_idx ON tl_census_fields USING btree (table_id, field_name);
+CREATE INDEX tl_census_geographies_geoid_idx ON tl_census_geographies USING btree (geoid);
+CREATE INDEX tl_census_geographies_geometry_idx ON tl_census_geographies USING gist (geometry);
+CREATE INDEX tl_census_geographies_layer_name_idx ON tl_census_geographies USING btree (layer_name);
+CREATE INDEX tl_census_geographies_source_id_idx ON tl_census_geographies USING btree (source_id);
+CREATE INDEX tl_census_sources_dataset_id_idx ON tl_census_sources USING btree (dataset_id);
+CREATE INDEX tl_census_tables_dataset_id_idx ON tl_census_tables USING btree (dataset_id);
+CREATE UNIQUE INDEX tl_census_tables_dataset_id_table_name_idx ON tl_census_tables USING btree (dataset_id, table_name);
+CREATE INDEX tl_census_tables_table_name_idx ON tl_census_tables USING btree (table_name);
+CREATE UNIQUE INDEX tl_census_values_geography_id_table_id_idx ON tl_census_values USING btree (geography_id, table_id);
+CREATE INDEX tl_ext_gtfs_stops_feed_version_id_idx ON tl_ext_gtfs_stops USING btree (feed_version_id);
+CREATE INDEX tl_ext_gtfs_stops_target_feed_onestop_id_idx ON tl_ext_gtfs_stops USING btree (target_feed_onestop_id);
+CREATE INDEX tl_ext_gtfs_stops_target_stop_id_idx ON tl_ext_gtfs_stops USING btree (target_stop_id);
+CREATE INDEX tl_route_geometries_combined_geometry_idx ON tl_route_geometries USING gist (combined_geometry);
+CREATE INDEX tl_route_onestop_ids_feed_version_id_idx ON tl_route_onestop_ids USING btree (feed_version_id);
+CREATE INDEX tl_route_onestop_ids_onestop_id_idx ON tl_route_onestop_ids USING btree (onestop_id);
+CREATE UNIQUE INDEX tl_route_onestop_ids_route_id_idx ON tl_route_onestop_ids USING btree (route_id);
+CREATE INDEX tl_stop_external_references_feed_version_id_idx ON tl_stop_external_references USING btree (feed_version_id);
+CREATE INDEX tl_stop_external_references_target_feed_onestop_id_idx ON tl_stop_external_references USING btree (target_feed_onestop_id);
+CREATE INDEX tl_stop_external_references_target_stop_id_idx ON tl_stop_external_references USING btree (target_stop_id);
+CREATE INDEX tl_stop_onestop_ids_feed_version_id_idx ON tl_stop_onestop_ids USING btree (feed_version_id);
+CREATE INDEX tl_stop_onestop_ids_onestop_id_idx ON tl_stop_onestop_ids USING btree (onestop_id);
+CREATE UNIQUE INDEX tl_stop_onestop_ids_stop_id_idx ON tl_stop_onestop_ids USING btree (stop_id);
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_0_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_0_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_0_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_0_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_1_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_1_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_1_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_1_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_2_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_2_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_2_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_2_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_3_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_3_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_3_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_3_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_4_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_4_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_4_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_4_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_5_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_5_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_5_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_5_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_6_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_6_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_6_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_6_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_7_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_7_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_7_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_7_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_8_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_8_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_8_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_8_trip_id_idx;
+ALTER INDEX gtfs_stop_times_feed_version_id_trip_id_stop_id_idx ATTACH PARTITION gtfs_stop_times_9_feed_version_id_trip_id_stop_id_idx;
+ALTER INDEX gtfs_stop_times_pkey1 ATTACH PARTITION gtfs_stop_times_9_pkey;
+ALTER INDEX gtfs_stop_times_stop_id_idx ATTACH PARTITION gtfs_stop_times_9_stop_id_idx;
+ALTER INDEX gtfs_stop_times_trip_id_idx ATTACH PARTITION gtfs_stop_times_9_trip_id_idx;
+ALTER TABLE ONLY current_operators_in_feed
+    ADD CONSTRAINT current_operators_in_feed_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY current_operators_in_feed
+    ADD CONSTRAINT current_operators_in_feed_feed_id_fkey FOREIGN KEY (feed_id) REFERENCES current_feeds(id);
+ALTER TABLE ONLY current_operators_in_feed
+    ADD CONSTRAINT current_operators_in_feed_operator_id_fkey FOREIGN KEY (operator_id) REFERENCES current_operators(id);
+ALTER TABLE ONLY ext_faresv2_areas
+    ADD CONSTRAINT ext_faresv2_areas_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_faresv2_fare_capping
+    ADD CONSTRAINT ext_faresv2_fare_capping_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_faresv2_fare_containers
+    ADD CONSTRAINT ext_faresv2_fare_containers_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_faresv2_fare_leg_rules
+    ADD CONSTRAINT ext_faresv2_fare_leg_rules_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_faresv2_fare_products
+    ADD CONSTRAINT ext_faresv2_fare_products_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_faresv2_fare_timeframes
+    ADD CONSTRAINT ext_faresv2_fare_timeframes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_faresv2_fare_transfer_rules
+    ADD CONSTRAINT ext_faresv2_fare_transfer_rules_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_faresv2_rider_categories
+    ADD CONSTRAINT ext_faresv2_rider_categories_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_calendar_attributes
+    ADD CONSTRAINT ext_plus_calendar_attributes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_calendar_attributes
+    ADD CONSTRAINT ext_plus_calendar_attributes_service_id_fkey FOREIGN KEY (service_id) REFERENCES gtfs_calendars(id);
+ALTER TABLE ONLY ext_plus_directions
+    ADD CONSTRAINT ext_plus_directions_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_directions
+    ADD CONSTRAINT ext_plus_directions_route_id_fkey FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY ext_plus_fare_rider_categories
+    ADD CONSTRAINT ext_plus_fare_rider_categories_fare_id_fkey FOREIGN KEY (fare_id) REFERENCES gtfs_fare_attributes(id);
+ALTER TABLE ONLY ext_plus_fare_rider_categories
+    ADD CONSTRAINT ext_plus_fare_rider_categories_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_farezone_attributes
+    ADD CONSTRAINT ext_plus_farezone_attributes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_realtime_routes
+    ADD CONSTRAINT ext_plus_realtime_routes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_realtime_routes
+    ADD CONSTRAINT ext_plus_realtime_routes_route_id_fkey FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY ext_plus_realtime_stops
+    ADD CONSTRAINT ext_plus_realtime_stops_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_realtime_stops
+    ADD CONSTRAINT ext_plus_realtime_stops_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY ext_plus_realtime_stops
+    ADD CONSTRAINT ext_plus_realtime_stops_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES gtfs_trips(id);
+ALTER TABLE ONLY ext_plus_realtime_trips
+    ADD CONSTRAINT ext_plus_realtime_trips_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_realtime_trips
+    ADD CONSTRAINT ext_plus_realtime_trips_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES gtfs_trips(id);
+ALTER TABLE ONLY ext_plus_rider_categories
+    ADD CONSTRAINT ext_plus_rider_categories_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY ext_plus_rider_categories
+    ADD CONSTRAINT ext_plus_rider_categories_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_stop_attributes
+    ADD CONSTRAINT ext_plus_stop_attributes_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_stop_attributes
+    ADD CONSTRAINT ext_plus_stop_attributes_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY ext_plus_timepoints
+    ADD CONSTRAINT ext_plus_timepoints_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY ext_plus_timepoints
+    ADD CONSTRAINT ext_plus_timepoints_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY ext_plus_timepoints
+    ADD CONSTRAINT ext_plus_timepoints_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES gtfs_trips(id);
+ALTER TABLE ONLY feed_version_file_infos
+    ADD CONSTRAINT feed_version_file_infos_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY feed_version_service_levels
+    ADD CONSTRAINT feed_version_service_levels_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_trips
+    ADD CONSTRAINT fk_rails_05ead08753 FOREIGN KEY (shape_id) REFERENCES gtfs_shapes(id);
+ALTER TABLE ONLY tl_route_headways
+    ADD CONSTRAINT fk_rails_078ffc5894 FOREIGN KEY (service_id) REFERENCES gtfs_calendars(id);
+ALTER TABLE ONLY gtfs_transfers
+    ADD CONSTRAINT fk_rails_0cc6ff288a FOREIGN KEY (from_stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY tl_route_headways
+    ADD CONSTRAINT fk_rails_19cb5c8c5c FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_agency_geometries
+    ADD CONSTRAINT fk_rails_1bfa787783 FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY tl_route_stops
+    ADD CONSTRAINT fk_rails_1dee96ee31 FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY tl_route_stops
+    ADD CONSTRAINT fk_rails_1f4cc828f8 FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY feed_version_gtfs_imports
+    ADD CONSTRAINT fk_rails_2d141782c9 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_fare_rules
+    ADD CONSTRAINT fk_rails_33e9869c97 FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY gtfs_stops
+    ADD CONSTRAINT fk_rails_3a83952954 FOREIGN KEY (parent_station) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY gtfs_calendars
+    ADD CONSTRAINT fk_rails_42538db9b2 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY feed_states
+    ADD CONSTRAINT fk_rails_5189447149 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_frequencies
+    ADD CONSTRAINT fk_rails_6e6295037f FOREIGN KEY (trip_id) REFERENCES gtfs_trips(id);
+ALTER TABLE ONLY tl_route_geometries
+    ADD CONSTRAINT fk_rails_71ddc895e1 FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY tl_agency_places
+    ADD CONSTRAINT fk_rails_736d85abf8 FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY tl_agency_places
+    ADD CONSTRAINT fk_rails_782a6056d8 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_calendar_dates
+    ADD CONSTRAINT fk_rails_7a365f570b FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_feed_version_geometries
+    ADD CONSTRAINT fk_rails_8398615a04 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_shapes
+    ADD CONSTRAINT fk_rails_84a74e83d8 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_stops
+    ADD CONSTRAINT fk_rails_860ffa5a40 FOREIGN KEY (level_id) REFERENCES gtfs_levels(id);
+ALTER TABLE ONLY tl_route_stops
+    ADD CONSTRAINT fk_rails_86271126ad FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_agency_geometries
+    ADD CONSTRAINT fk_rails_8a1bd61db9 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_fare_attributes
+    ADD CONSTRAINT fk_rails_8a3ca847de FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_pathways
+    ADD CONSTRAINT fk_rails_8d7bf46256 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_route_headways
+    ADD CONSTRAINT fk_rails_93324ef20d FOREIGN KEY (selected_stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY feed_states
+    ADD CONSTRAINT fk_rails_99eaedcf98 FOREIGN KEY (feed_id) REFERENCES current_feeds(id);
+ALTER TABLE ONLY tl_route_headways
+    ADD CONSTRAINT fk_rails_9a487f871b FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY gtfs_transfers
+    ADD CONSTRAINT fk_rails_a030c4a2a9 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_routes
+    ADD CONSTRAINT fk_rails_a5ff5a2ceb FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_pathways
+    ADD CONSTRAINT fk_rails_a668e1e0ac FOREIGN KEY (to_stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY gtfs_agencies
+    ADD CONSTRAINT fk_rails_a7e0c4685b FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_trips
+    ADD CONSTRAINT fk_rails_a839da033a FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_fare_attributes
+    ADD CONSTRAINT fk_rails_b096f74e03 FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY feed_versions
+    ADD CONSTRAINT fk_rails_b5365c3cf3 FOREIGN KEY (feed_id) REFERENCES current_feeds(id);
+ALTER TABLE ONLY tl_route_geometries
+    ADD CONSTRAINT fk_rails_b9fc0ae4ad FOREIGN KEY (shape_id) REFERENCES gtfs_shapes(id);
+ALTER TABLE ONLY gtfs_fare_rules
+    ADD CONSTRAINT fk_rails_bd7d178423 FOREIGN KEY (fare_id) REFERENCES gtfs_fare_attributes(id);
+ALTER TABLE ONLY gtfs_fare_rules
+    ADD CONSTRAINT fk_rails_c336ea9f1a FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_levels
+    ADD CONSTRAINT fk_rails_c5fba46e47 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_route_geometries
+    ADD CONSTRAINT fk_rails_c858a218e2 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_calendar_dates
+    ADD CONSTRAINT fk_rails_ca504bc01f FOREIGN KEY (service_id) REFERENCES gtfs_calendars(id);
+ALTER TABLE ONLY tl_route_stops
+    ADD CONSTRAINT fk_rails_cc9fde6bb7 FOREIGN KEY (stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY gtfs_stops
+    ADD CONSTRAINT fk_rails_cf4bc79180 FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_frequencies
+    ADD CONSTRAINT fk_rails_d1b468024b FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_trips
+    ADD CONSTRAINT fk_rails_d2c6f99d5e FOREIGN KEY (service_id) REFERENCES gtfs_calendars(id);
+ALTER TABLE ONLY gtfs_pathways
+    ADD CONSTRAINT fk_rails_df846a6b54 FOREIGN KEY (from_stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY gtfs_transfers
+    ADD CONSTRAINT fk_rails_e1c56f7da4 FOREIGN KEY (to_stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY gtfs_routes
+    ADD CONSTRAINT fk_rails_e5eb0f1573 FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY gtfs_feed_infos
+    ADD CONSTRAINT fk_rails_eb863abbac FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY gtfs_trips
+    ADD CONSTRAINT fk_rails_mid93550f50 FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY gtfs_levels
+    ADD CONSTRAINT gtfs_levels_parent_station_fkey FOREIGN KEY (parent_station) REFERENCES gtfs_stops(id);
+ALTER TABLE gtfs_stop_times
+    ADD CONSTRAINT gtfs_stop_times_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE gtfs_stop_times
+    ADD CONSTRAINT gtfs_stop_times_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES gtfs_stops(id);
+ALTER TABLE gtfs_stop_times
+    ADD CONSTRAINT gtfs_stop_times_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES gtfs_trips(id);
+ALTER TABLE ONLY tl_agency_onestop_ids
+    ADD CONSTRAINT tl_agency_onestop_ids_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES gtfs_agencies(id);
+ALTER TABLE ONLY tl_agency_onestop_ids
+    ADD CONSTRAINT tl_agency_onestop_ids_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_census_fields
+    ADD CONSTRAINT tl_census_fields_table_id_fkey FOREIGN KEY (table_id) REFERENCES tl_census_tables(id);
+ALTER TABLE ONLY tl_census_geographies
+    ADD CONSTRAINT tl_census_geographies_source_id_fkey FOREIGN KEY (source_id) REFERENCES tl_census_sources(id);
+ALTER TABLE ONLY tl_census_sources
+    ADD CONSTRAINT tl_census_sources_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES tl_census_datasets(id);
+ALTER TABLE ONLY tl_census_tables
+    ADD CONSTRAINT tl_census_tables_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES tl_census_datasets(id);
+ALTER TABLE ONLY tl_census_values
+    ADD CONSTRAINT tl_census_values_geography_id_fkey FOREIGN KEY (geography_id) REFERENCES tl_census_geographies(id);
+ALTER TABLE ONLY tl_census_values
+    ADD CONSTRAINT tl_census_values_table_id_fkey FOREIGN KEY (table_id) REFERENCES tl_census_tables(id);
+ALTER TABLE ONLY tl_ext_fare_networks
+    ADD CONSTRAINT tl_ext_fare_networks_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_ext_gtfs_stops
+    ADD CONSTRAINT tl_ext_gtfs_stops_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_ext_gtfs_stops
+    ADD CONSTRAINT tl_ext_gtfs_stops_id_fkey FOREIGN KEY (id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY tl_route_onestop_ids
+    ADD CONSTRAINT tl_route_onestop_ids_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_route_onestop_ids
+    ADD CONSTRAINT tl_route_onestop_ids_route_id_fkey FOREIGN KEY (route_id) REFERENCES gtfs_routes(id);
+ALTER TABLE ONLY tl_stop_external_references
+    ADD CONSTRAINT tl_stop_external_references_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_stop_external_references
+    ADD CONSTRAINT tl_stop_external_references_id_fkey FOREIGN KEY (id) REFERENCES gtfs_stops(id);
+ALTER TABLE ONLY tl_stop_onestop_ids
+    ADD CONSTRAINT tl_stop_onestop_ids_feed_version_id_fkey FOREIGN KEY (feed_version_id) REFERENCES feed_versions(id);
+ALTER TABLE ONLY tl_stop_onestop_ids
+    ADD CONSTRAINT tl_stop_onestop_ids_stop_id_fkey FOREIGN KEY (stop_id) REFERENCES gtfs_stops(id);
